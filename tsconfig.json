@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "outDir": "./dist/",
+        "sourceMap": true,
+        "module": "amd",
+        "noImplicitAny": true,
+        "module": "es6",
+        "target": "es5"
+    }
+}
+
