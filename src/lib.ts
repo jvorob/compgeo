@@ -1,11 +1,6 @@
 import { vec2 } from "gl-matrix";
 
 
-//generates a random point in the unit square
-function genRandomPoint() {
-  return vec2.fromValues(Math.random(),Math.random());
-}
-
 type Context = CanvasRenderingContext2D;
 export class MyCanvas {
   /* Wrapper around canvas
@@ -25,6 +20,8 @@ export class MyCanvas {
     this.ctx = canvas.getContext("2d");
 
     this.putRect(vec2.fromValues(-1,-1), vec2.fromValues(1,1));
+    this.putLine(vec2.fromValues(-1,0), vec2.fromValues(1,0));
+    this.putLine(vec2.fromValues(0,-1), vec2.fromValues(0,1));
   }
 
   getCanvasSize() {
@@ -52,6 +49,8 @@ export class MyCanvas {
     let v = vec2.create();
     vec2.scale(v, p, this.getScaleFactor());
     
+    
+    
     //Then translate to canvas center
     vec2.add(v, v, canvasCenter);
     return v;
@@ -62,9 +61,13 @@ export class MyCanvas {
   // =======================================================
 
   //point in worldspace, rad in pixels
-  putPoint(p: vec2, radius=2) {
+  putPoint(p: vec2, radius=2, style="black") {
     let v = this.world2screen(p);
+
+    this.ctx.save();
+    this.ctx.fillStyle=style;
     this.fillCircle(v, radius);
+    this.ctx.restore();
   }
 
   putLine(p1: vec2, p2: vec2) {
@@ -111,33 +114,3 @@ export class MyCanvas {
 
 
 
-
-
-// moves the point x,y into the center of the screen
-function centerOn(ctx: Context, x: number, y: number) {
-  ctx.translate(ctx.canvas.width / 2 - x, ctx.canvas.height / 2 - y);
-}
-
-
-export function testFun(htmlid: string) {
-  let el: HTMLCanvasElement = document.getElementById(htmlid) as HTMLCanvasElement;
-  let canv = new MyCanvas(el);
-
-  //put the origin in the center
-  //centerOn(context, 0, 0);
-
-
-  //scale so unit circle takes up the screen
-  //scaleSize(context, 2.2, 2.2);
-
-  //rect
-  //context.lineWidth = 0.01;
-  //context.strokeRect(-1, -1, 2, 2);
-
-  for(let i = 0; i < 15; i++ ) {
-    canv.putPoint(genRandomPoint());
-  }
-  for(let i = 0; i < 10; i++ ) {
-    //canv.putLine(genRandomPoint(), genRandomPoint());
-  }
-}
