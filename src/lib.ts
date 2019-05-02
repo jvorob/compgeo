@@ -2,7 +2,8 @@ import { vec2 } from "gl-matrix";
 
 
 type Context = CanvasRenderingContext2D;
-export class MyCanvas {
+
+export class WrappedCanvas {
   /* Wrapper around canvas
    * Handles worldspace and screenspace coordinates separately
    *
