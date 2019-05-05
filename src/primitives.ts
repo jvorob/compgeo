@@ -18,10 +18,9 @@ import { vec2 } from "gl-matrix";
 //look at just y coord
 //
 //this will be positive when AC is rotated +x->+y from AB
-//since we have +x right and +y down, this will actually be a right operator
 
-export function right(a: vec2, b: vec2, c:vec2) {
- // returns + if c right of a->b (since coords go clockwise)
+export function left(a: vec2, b: vec2, c:vec2) {
+ // returns + if c left of a->b (since coords go clockwise)
  return (c[1] - a[1]) * (b[0] - a[0])  - 
         (c[0] - a[0]) * (b[1] - a[1]);
 }
@@ -40,7 +39,7 @@ export function pseudoAngle(x: number, y:number) {
   }
 }
 
-//as in right(), returns a vector representing the angle difference from AB to AC
+//as in left(), returns a vector representing the angle difference from AB to AC
 //(multiplied by x^2 + y^2)
 function vecAngle(a: vec2, b: vec2, c:vec2) {
   let x = (c[0] - a[0]) * (b[0] - a[0]) +

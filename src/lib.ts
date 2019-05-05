@@ -42,14 +42,17 @@ export class WrappedCanvas {
 
   //Takes point in worldspace coords, shifts to screenspace so it's centered and scaled
   world2screen(p: vec2) {
-    let canvasSize = this.getCanvasSize();
-    let canvasCenter = vec2.create();
+    const flipY = vec2.fromValues(1, -1);
+    const canvasSize = this.getCanvasSize();
+    const canvasCenter = vec2.create();
     vec2.scale(canvasCenter, canvasSize, 0.5);
 
     //First scale up
     let v = vec2.create();
     vec2.scale(v, p, this.getScaleFactor());
-    
+
+    //Then flip y
+    vec2.multiply(v, v, flipY);
     
     
     //Then translate to canvas center

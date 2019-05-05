@@ -1,7 +1,8 @@
 import { beep } from "./test";
 import { WrappedCanvas } from "./lib";
 import { vec2 } from "gl-matrix";
-import { right, orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
+import { left, orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
+import { genRandomPoint, v2ToString} from "./util";
 
 
 let globalCanvas: WrappedCanvas;
@@ -67,9 +68,9 @@ export function testFun() {
 
       if(labelling == "rightleft") {
         style="red"
-        let rightness = right(center,dir,p);
-        if(rightness > 0) {
-            style = "blue"; //`rgb(0,125,${Math.floor(rightness * 340)})`;
+        let leftness = left(center,dir,p);
+        if(leftness > 0) {
+            style = "blue"; //`rgb(0,125,${Math.floor(leftness * 340)})`;
             //console.log(style);
         }
       } else if(labelling == "angle") {
@@ -90,22 +91,6 @@ export function testFun() {
 
 
 
-//==========================
-// UTILITIES
-
-
-//generates a random point in the unit square
-function genRandomPoint(): vec2 {
-  let testV = vec2.fromValues(Math.random()*2 - 1,Math.random() * 2 - 1);
-  if(vec2.len(testV) > 1) { return genRandomPoint(); }
-  else {return testV;}
-}
-
-
-function v2ToString(v: vec2) { return `(${v[0].toPrecision(3)}, ${v[1].toPrecision(3)})`; }
-function pointListToString(v: vec2[]) {
-  return `List (n=${v.length}):\n` + v.map(v2ToString).join("\n") + ";";
-}
 
 
 // ============================
@@ -139,7 +124,7 @@ function giftWrap(points: vec2[]) {
 
   // takes the last two points, 
   // takes the vector from last2 to last1,
-  // finds the next closest by angle turning i-wards (CW) around last1
+  // finds the next closest by angle turning i-wards (CCW) around last1
   // TODO: throws if points on wrong side
   // pops found point and returns it
   function wrapNext(last2: vec2, last1: vec2) {
@@ -165,7 +150,7 @@ function giftWrap(points: vec2[]) {
     //console.log(v2ToString(last2), v2ToString(last1));
     //console.log(pointListToString(points));
 
-    //first point is just right of the tangent
+    //first point is just left of the tangent
     let [nextPoint] = points.splice(bestInd, 1); //take out 1
     return nextPoint;
   }
@@ -196,8 +181,8 @@ function giftWrap(points: vec2[]) {
     //console.log("Next Point: " + v2ToString(nextPoint));
 
     // === TEST CLOSURE
-    //if last->next is right of last->start
-    if(right(last, start, nextPoint) > 0) {
+    //if last->next is left of last->start
+    if(left(last, start, nextPoint) > 0) {
       //close the hull TODO TEMP
       hull.push(start);
       points.push(nextPoint); //put it back, we didnt use it TODO
