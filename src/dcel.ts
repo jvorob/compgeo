@@ -24,22 +24,11 @@ export class DCEL {
     this.verts.push(v3);
     this.verts.push(v4);
 
-    let e1 = new HalfEdge();
-    let e2 = new HalfEdge();
-    e1.next = e2;
-    e1.prev = e2;
-    e1.twin = e2;
-    e1.origin = v1;
-    v1.someEdgeAway = e1;
 
-    e2.next = e1;
-    e2.prev = e1;
-    e2.twin = e1;
-    e2.origin = v2;
-    v2.someEdgeAway = e2;
-
-    this.edges.push(e1);
-    this.edges.push(e2);
+    this.insertEdge(v1,v2);
+    this.insertEdge(v2,v3);
+    this.insertEdge(v3,v4);
+    this.insertEdge(v4,v1);
 
     console.log(this.getHalfEdgeHittingRay(v3,v4))
     console.log(this.getHalfEdgeHittingRay(v1,v4))
@@ -83,6 +72,94 @@ export class DCEL {
     } 
 
     return best_e;
+  }
+
+  insertEdge(Va: Vertex, Vb: Vertex) {
+    // Inserts two half-edges between Va and Vb
+    // If edge would intersect some other edge, throws.
+    //
+    // twins them together
+    // inserts into this.edges[]
+    // patches up next/prev pointers of appropriate edges 
+    // TODO: fix faces
+    // returns edge from a to b
+    //
+    // TODO THOUGHTS: api doesnt define how to handle splitting of faces.
+    // Will ultimately depend on sites and things
+    //
+    //
+    //---------------------------------------------------*
+    //              Ea                                   |
+    //        < \ \               > /                    |
+    //         \ \ >    E_ab     / /  /                  |
+    //            \      =>       /  <                   |
+    //            Va - - - - - -Vb                       |
+    //          > /      <=       \                      |
+    //         / / /    E_ba     < \ \                   |
+    //          / <               \ \ >                  |
+    //                          Eb                       |
+    //                                                   |
+    //Ea and Eb are found by calling getHalfEdgeHittingRay
+    
+
+    // ============ CHECK IF EDGES INTERSECT
+    // !!!!!!!! TODO  !!!!!!!!!!!!
+
+    // Make two twinned half-edges
+    let E_ab = new HalfEdge();
+    let E_ba = new HalfEdge();
+
+    E_ab.twin = E_ba;
+    E_ba.twin = E_ab;
+
+    E_ab.origin = Va;
+    E_ba.origin = Vb;
+
+    
+    // =============== SPLICE IN NEXT/PREV =============
+    // (also attaches edge to vertex if empty)
+
+    function linkEdges(e1:HalfEdge, e2: HalfEdge) {
+      //connects next and prev pointers for e1->e2
+       e1.next = e2; e2.prev = e1; }
+
+    function spliceEdgesAround(V: Vertex, incoming_edge: HalfEdge,
+                              new_away: HalfEdge, new_towards: HalfEdge) {
+      //          \ \ incoming_edge            |
+      //         \ \ >                       |
+      //            \      => new_away       |
+      //             V - - - - -             |
+      //          > /      <= new_towards    |
+      //         / / /                       |
+      //          / < incoming_edge.next     |
+     
+      if(incoming_edge == null) {
+        // Vertex has no edges, so new ones just wrap around
+        linkEdges(new_towards, new_away); 
+        Va.someEdgeAway = E_ab; //Also need to add edge to formerly-empty point
+        
+      } else { //link things up normally
+        linkEdges(new_towards, incoming_edge.next);
+        linkEdges(incoming_edge, new_away);
+      }
+    }
+
+    let Ea = this.getHalfEdgeHittingRay(Va, Vb);
+    let Eb = this.getHalfEdgeHittingRay(Vb, Va);
+    spliceEdgesAround(Va, Ea, E_ab, E_ba); //v, e, new_away, new_towards
+    spliceEdgesAround(Vb, Eb, E_ba, E_ab);
+
+    // =============== FIX UP FACES =============
+    // TODO !!!!
+    // walk from E_ab. If we run into E_ba before coming around, then faces are connected
+    // else need to split
+
+    // ====== Insert into arrays
+    this.edges.push(E_ab);
+    this.edges.push(E_ba);
+
+    return E_ab;
+
   }
 }
 
