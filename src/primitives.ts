@@ -30,7 +30,12 @@ export function left(a: vec2, b: vec2, c:vec2) {
 
 // returns pseudoangle of a vector x,y
 // pseudoangle is [0,4) on angle = [0,2pi)
+// throws on 0,0
 export function pseudoAngle(x: number, y:number) {
+  if(x == 0 && y == 0) { throw Error("pseudoAngle(0,0) is undefined"); }
+  //TODO: make this more catchable?
+  
+
   let p = x / (Math.abs(x) + Math.abs(y)); //-1 to 1 on +y (-1 at +x, 1 at -x)
   if( y >= 0 ) {
     return 1 - p;// (0 at +x, up to 2 at -x)
@@ -39,9 +44,12 @@ export function pseudoAngle(x: number, y:number) {
   }
 }
 
-//as in left(), returns a vector representing the angle difference from AB to AC
+//as in left(), returns a vector representing the angle difference from AB to AC around A
 //(multiplied by x^2 + y^2)
-function vecAngle(a: vec2, b: vec2, c:vec2) {
+//Translates B and C by -A so both are relative to A
+//Rotates (B-A) to x-axis and (C-A) with it
+//Now angle from x-axis to C is angle from AB to AC
+export function vecAngle(a: vec2, b: vec2, c:vec2) {
   let x = (c[0] - a[0]) * (b[0] - a[0]) +
           (c[1] - a[1]) * (b[1] - a[1]);
 
@@ -58,7 +66,7 @@ function vecAngle(a: vec2, b: vec2, c:vec2) {
 }
 
 export function orientPseudoAngle(a: vec2, b: vec2, c: vec2) {
-  /* Returns oriented pseduoangle from AB to AC 
+  /* Returns oriented pseduoangle from AB to AC around A
    * (a,b,c collinear is 0, 
    * c left of ab is 0,180 
    * c right of ab is 180,360)
