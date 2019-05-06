@@ -17,3 +17,14 @@ export function v2ToString(v: vec2) { return `(${v[0].toPrecision(3)}, ${v[1].to
 function pointListToString(v: vec2[]) {
   return `List (n=${v.length}):\n` + v.map(v2ToString).join("\n") + ";";
 }
+
+export function  intStrZeroPad(n: number, width:number) {
+  //Zero pad up to width 32;
+  const nstr = n.toFixed(0); //take integer portion to string
+  const pad_amount = Math.max(0, width - nstr.length);
+  if(pad_amount > 32) {
+    throw Error("intStrZeroPad doesn't work past 32 zeroes"); //TODO fix this 
+  }
+  const zeroes = "00000000000000000000000000000000";
+  return zeroes.slice(0,pad_amount) + nstr;
+}
