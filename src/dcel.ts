@@ -1,5 +1,5 @@
 import { vec2 } from "gl-matrix";
-import { left, orientPseudoAngle, distPointToLine } from "./primitives";
+import { left, orientPseudoAngle, distPointToSeg } from "./primitives";
 import { min, max, intStrZeroPad } from "./util";
 
 export class DCEL {
@@ -274,7 +274,7 @@ export class DCEL {
     // ======== EDGES
     function edge_dist (edge:HalfEdge) {
       const [p1, p2] = edge.getPoints();
-      return distPointToLine(pt, p1, p2);
+      return distPointToSeg(pt, p1, p2);
     }
 
     //no closest vertex, try for an edge

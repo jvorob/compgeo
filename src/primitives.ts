@@ -35,6 +35,24 @@ export function distPointToLine(pt: vec2, a: vec2, b:vec2){
   return Math.abs(left(a,b,pt)) / Math.sqrt(squaredLen);
 }
 
+export function distPointToSeg(pt: vec2, a: vec2, b:vec2){
+  // Returns the distance of pt to segment ab
+  //      a_ line  |      |
+  //  pt  |   dist |  pt  |
+  //  dst a--------b  dst |
+  //      |        |      |
+  //      |        b_     |
+  
+  const a_ = pointRelToVector(a,b,0,1);
+  const b_ = pointRelToVector(b,a,0,1);
+
+  //first check if we're past either endpoint of the line
+  if(left(a,a_,pt) > 0) { return vec2.dist(a,pt); }
+  if(left(b,b_,pt) > 0) { return vec2.dist(b,pt); }
+
+  //else, we're in the middle section
+  return distPointToLine(pt, a, b);
+}
 
 
 
