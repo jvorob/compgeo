@@ -26,7 +26,7 @@ function edgeWalkReduce<T>(start_edge: HalfEdge, step: Stepper, reduce: Reducer<
   return accum;
 }
 
-function edgeWalkForEach<T>(start_edge: HalfEdge, step: Stepper, doThing: Action<T>) {
+export function edgeWalkForEach<T>(start_edge: HalfEdge, step: Stepper, doThing: Action<T>) {
   //walks edges using step(e)
   //calls action on each
   
@@ -408,8 +408,11 @@ export class DCEL {
       }
     }
 
-    //TODO: check which face it's in
-
+    // ======= FACES
+    for(let i = 0; i < this.faces.length; i++){
+      if(this.faces[i].containsPoint(pt))
+      {return this.faces[i]; }
+    }
 
     return null;
   }
@@ -452,6 +455,21 @@ export class Face {
 
   constructor(public dcel: DCEL, isInf = false) {
     this.isInf = isInf;
+  }
+
+  public toString() {
+    return this.dcel.toStringElem(this);
+  }
+
+  containsPoint(pt: vec2) {
+    // If face left of all edges or on edges
+    let allleft = true;
+    edgeWalkForEach(this.someEdge, e=>e.next, e=> {
+      const [v1, v2] = e.getPoints();
+      if(left(v1, v2, pt) < 0) { allleft = false; } //if right of line
+    });
+
+    return allleft;
   }
 
   static splitAt(edge: HalfEdge) {

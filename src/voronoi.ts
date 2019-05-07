@@ -1,7 +1,7 @@
 import { WrappedCanvas } from "./lib";
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "./util";
-import { DCEL, Vertex, HalfEdge, Face } from "./dcel";
+import { edgeWalkForEach, DCEL, Vertex, HalfEdge, Face } from "./dcel";
 import { left, pointRelToVector, orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
 
 
@@ -70,6 +70,12 @@ class VoronoiTester {
   }
 
 
+  drawFace(face: Face, style="black") {
+    edgeWalkForEach(face.someEdge, e=>e.next, e=> {
+      this.canvas.putLine(e.origin.v,e.next.origin.v,style);
+    });
+  }
+
   drawFeature(elem: Vertex|HalfEdge|Face, style="black") {
     //delegates to the appropriate method
     if(elem == null) 
@@ -78,6 +84,8 @@ class VoronoiTester {
       { this.drawVert(elem,style); }
     else if(elem instanceof HalfEdge)
       { this.drawHalfEdge(elem,style); }
+    else if(elem instanceof Face) 
+      { this.drawFace(elem, style); }
     else { throw Error("drawFeature not implemented for" + elem); }
   }
 
@@ -89,6 +97,8 @@ class VoronoiTester {
       { this.debugDrawVert(elem); }
     else if(elem instanceof HalfEdge)
       { this.debugDrawHalfEdge(elem); }
+    else if(elem instanceof Face) 
+      { this.debugDrawFace(elem); }
     else { throw Error("debugDrawFeature not implemented for" + elem); }
   }
 
@@ -106,6 +116,12 @@ class VoronoiTester {
     this.drawHalfEdge(edge.prev, "orangered");
     this.drawHalfEdge(edge, "red");
     this.drawHalfEdge(edge.next, "darkmagenta");
+  }
+
+  debugDrawFace(face: Face) {
+    edgeWalkForEach(face.someEdge, e=> e.next, e=> this.drawHalfEdge(e, "green"));
+
+    this.drawHalfEdge(face.someEdge, "red");
 
   }
 
@@ -117,6 +133,8 @@ class VoronoiTester {
 
     //add a little arrow, size relative to edge length?
     this.dcel.edges.forEach(edge => this.drawHalfEdge(edge));
+
+    //dont draw faces
   }
 
 
