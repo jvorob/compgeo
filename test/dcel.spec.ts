@@ -99,14 +99,14 @@ describe("dcel with test graph", function() {
     for(let i = 0; i < e.length; i++){dcel.edges.push(e[i]);}
 
     // ========= Link verts to edges
-    e[0].origin = v[0];
-    e[1].origin = e[2].origin = v[1];
-    e[3].origin = e[4].origin = v[2];
-    e[5].origin = v[3];
-    v[0].someEdgeAway = e[0];
-    v[1].someEdgeAway = e[1];
-    v[2].someEdgeAway = e[3];
-    v[3].someEdgeAway = e[5];
+    e[1].origin = v[0];
+    e[3].origin = e[0].origin = v[1];
+    e[2].origin = e[5].origin = v[2];
+    e[4].origin = v[3];
+    v[0].someEdgeAway = e[1];
+    v[1].someEdgeAway = e[0];
+    v[2].someEdgeAway = e[2];
+    v[3].someEdgeAway = e[4];
 
     // ============= Link edges to each other
     function twinEdges(e1:HalfEdge, e2: HalfEdge) {
@@ -121,12 +121,12 @@ describe("dcel with test graph", function() {
     twinEdges(e[2],e[3]);
     twinEdges(e[4],e[5]);
 
-    linkEdges(e[0],e[2]);
-    linkEdges(e[2],e[4]);
-    linkEdges(e[4],e[5]);
-    linkEdges(e[5],e[3]);
-    linkEdges(e[3],e[1]);
-    linkEdges(e[1],e[0]);
+    linkEdges(e[1],e[3]);
+    linkEdges(e[3],e[5]);
+    linkEdges(e[5],e[4]);
+    linkEdges(e[4],e[2]);
+    linkEdges(e[2],e[0]);
+    linkEdges(e[0],e[1]);
 
     //TODO: setup faces
   });
@@ -134,16 +134,16 @@ describe("dcel with test graph", function() {
 
   // ALMOST-BOX SHAPED DCEL
   //                                                |
-  //                     <e0                        |
+  //                      e0>                       |
   //             v1 - - - - - - -  v0               |
-  //              |       e1>                       |
-  //               ^                                |
+  //              |      <e1                        |
+  //            ^                                   |
   //            e2|e3                               |
-  //            v                                   |
+  //               v                                |
   //              |                                 |
-  //                      <e5                       |
+  //                       e5>                      |
   //             v2 - - - - - - -  v3               |
-  //                      e4>                       |
+  //                     <e4                        |
   //                                                |
   //                                                |
   //             v4                                 |
@@ -158,12 +158,12 @@ describe("dcel with test graph", function() {
 
   describe("toStringElem", function() {
     it("should give a long string description of edges", function() {
-      const expected = "[e00: o=v00, t=e01, n=e02, p=e01, f=null]";
+      const expected = "[e00: o=v01, t=e01, n=e01, p=e02, f=null]";
       assert.equal(dcel.toStringElem(e[0]), expected);
     });
     it("should give a long string description of vertices", function() {
       const [x, y] = [v[2].v[0], v[2].v[1]]; //x and y coords
-      const expected = `[v02: (${x.toFixed(2)},${y.toFixed(2)}), e=e03]`;
+      const expected = `[v02: (${x.toFixed(2)},${y.toFixed(2)}), e=e02]`;
       assert.equal(dcel.toStringElem(v[2]), expected);
     });
   });
@@ -175,11 +175,11 @@ describe("dcel with test graph", function() {
     });
     it("should give the incoming edge if only 1", function() {
       let e_in = dcel.getHalfEdgeHittingRay(v[3],v[0]);
-      assertElemEqual(e_in, e[4]);
+      assertElemEqual(e_in, e[5]);
     });
     it("should give the edge whose next would the new edge a->b", function() {
       let e_in = dcel.getHalfEdgeHittingRay(v[2],v[0]);
-      assertElemEqual(e_in, e[5]);
+      assertElemEqual(e_in, e[3]);
     });
   });
 

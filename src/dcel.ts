@@ -110,12 +110,12 @@ export class DCEL {
     // Finds the half-edge whose next would be ray Va->Vb
     // If no edges, return null
     // Returns the half-edge pointing at Va
-    //        |           |
-    //        |           |
+    //      ^ |ein        |
+    //      | |v   ->     |
     //        a- - - - -b |
-    //       / \          |
-    //      /   \^        |
-    //     /     \ein     |
+    //       / \     <-   |
+    //      /   \         |
+    //     /     \        |
 
     const e_away = Va.someEdgeAway;
     if(e_away == null) {
@@ -127,11 +127,13 @@ export class DCEL {
 
 
 
-    // We want to walk all incoming vectors, and find the one with max angle relative to a->b
+    // We want to walk all incoming vectors, and find the one with min angle relative to a->b
+    // (immediately left of b)
+
 
     let curr_e = first_e_towards; //edge pointing towards Va
     let best_e = curr_e;
-    let max_angle = 0;  //pseudoangle is always 0..4
+    let min_angle = orientPseudoAngle(Va.v, Vb.v, curr_e.origin.v);  //pseudoangle is always 0..4
 
     //console.log("halfEdgeHitting ray, found some edges, starting at " + curr_e.toString());
     while(true) {
@@ -139,14 +141,14 @@ export class DCEL {
       //get pseudoangle from VaVb ccw towards e
       //falls in range 0-2 is left, 2-4 is right
       //we want the largest pseudoangle
-      
+
 
       //console.log("STEP: =======");
-      //console.log(`e: ${curr_e.toString()}, ang: ${e_angle} | best:${best_e.toString()}, ${max_angle}`);
+      //console.log(`e: ${curr_e.toString()}, ang: ${e_angle} | best:${best_e.toString()}, ${min_angle}`);
 
       //keep track of min
-      if(e_angle > max_angle) 
-      { best_e = curr_e; max_angle = e_angle; }
+      if(e_angle <= min_angle) 
+      { best_e = curr_e; min_angle = e_angle; }
 
       //move to next e or terminate
       curr_e = curr_e.next.twin;
@@ -155,7 +157,7 @@ export class DCEL {
     } 
 
     //console.log("DONE!");
-    //console.log(`best:${best_e.toString()}, ${max_angle}`);
+    //console.log(`best:${best_e.toString()}, ${min_angle}`);
 
     return best_e;
   }
@@ -232,6 +234,7 @@ export class DCEL {
       }
     }
 
+    //console.log(`Inserting edge from ${Va.toString()} to ${Vb.toString()}`);
     let Ea = this.getHalfEdgeHittingRay(Va, Vb);
     let Eb = this.getHalfEdgeHittingRay(Vb, Va);
     spliceEdgesAround(Va, Ea, E_ab, E_ba); //v, e, new_away, new_towards
