@@ -1,9 +1,16 @@
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "../src/util";
-import { left, pseudoAngle, vecAngle, orientPseudoAngle, orientPseudoAngle_unrolled } from "../src/primitives";
+import { left, pseudoAngle, vecAngle, 
+  orientPseudoAngle, orientPseudoAngle_unrolled,
+  pointRelToVector } from "../src/primitives";
 import { assert } from "chai";
 // mocha doesn't need to be imported because using mochapack???
 
+
+function assertVecEqual(va: vec2, vb:vec2) {
+  let msg = `Expected ${v2ToString(va)} to equal ${v2ToString(vb)}`;
+  assert(vec2.equals(va,vb), msg);
+}
 
 
 describe('primitives', function() {
@@ -92,11 +99,6 @@ describe('primitives', function() {
     //Also the final vecangle isn't normalized, so is scaled up by
     //x^2 + y^2
 
-    function assertVecEqual(va: vec2, vb:vec2) {
-      let msg = `Expected ${v2ToString(va)} to equal ${v2ToString(vb)}`;
-      assert(vec2.equals(va,vb), msg);
-    }
-
     let xp2 = vec2.fromValues(2,0);
 
     it("should be +x when collinear", function() {
@@ -150,6 +152,27 @@ describe('primitives', function() {
         const msg = `expected angles to match for ${s1} ${s2} ${s3}`;
         assert.closeTo(a1, a2, 0.000001, msg);
       }
+    });
+  });
+
+  describe('pointRelToVector', function() {
+    it("when relative to origin,+x, it should be normal", function() {
+      assertVecEqual(pointRelToVector(o, xp, 0, 0), o);
+      assertVecEqual(pointRelToVector(o, xp, 1, 0), xp);
+      assertVecEqual(pointRelToVector(o, xp, 0, 1), yp);
+      assertVecEqual(pointRelToVector(o, xp,-1,-1), q3);
+    });
+    it("works with shift", function() {
+      assertVecEqual(pointRelToVector(xm, o, 0, 0), xm);
+      assertVecEqual(pointRelToVector(xm, o, 1, 0), o);
+      assertVecEqual(pointRelToVector(xm, o, 0, 1), q2);
+      assertVecEqual(pointRelToVector(xm, o, 2, 1), q1);
+    });
+    it("works with rotate", function() {
+      assertVecEqual(pointRelToVector(ym, xp, 0, 0), ym);
+      assertVecEqual(pointRelToVector(ym, xp, 1, 0), xp);
+      assertVecEqual(pointRelToVector(ym, xp, 0, 1), xm);
+      assertVecEqual(pointRelToVector(ym, xp,.5,.5), o);
     });
   });
 

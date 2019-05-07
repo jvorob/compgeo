@@ -96,3 +96,52 @@ export function orientPseudoAngle_unrolled(a: vec2, b: vec2, c: vec2) {
     return p + 3; //2 at -x, up to 4 at +x
   }
 }
+
+
+export function rotate90CCW(a: vec2): vec2 {
+  // R:  [0  -1]
+  // R:  [1   0]
+  //(x,y) => (-y,x)
+  return vec2.fromValues(-a[1], a[0]);
+}
+
+export function pointRelToVector(a: vec2, b:vec2, forward:number, left:number): vec2 {
+  //returns the vector (forward, left) in the coordinate space defined by a and b
+  //(0,0) is a 
+  //(1,0) is b
+  //(0.5,0) is the midpoint
+  //
+  //(0,1) is 90 deg left of a, at the same distance is b
+  //(0,-1) is 90 deg right of b
+  //e.g.:
+  //
+  //                                 |
+  //     0,1             b 1,0       |
+  //         \         /             |
+  //          \     .5,0             |
+  //           \    /                |
+  //             a                   |
+  //            0,0       .5,-.5     |
+  //                                 |
+  //                                 |
+  
+  const v_forward = vec2.fromValues(b[0] - a[0], b[1] - a[1]);
+  const v_left = rotate90CCW(v_forward);
+
+
+  const result = vec2.create();
+  //result = (f * v_forward + l * v_left) + a
+  vec2.scaleAndAdd(result, result, v_forward, forward);
+  vec2.scaleAndAdd(result, result, v_left, left);
+  vec2.scaleAndAdd(result, result, a, 1);
+  return result;
+}
+
+// new primitives:
+// point intersects line
+// point intersects segment
+// point in face
+//
+// point within eps of point
+// point within eps of line
+// 
