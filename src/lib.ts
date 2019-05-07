@@ -1,6 +1,7 @@
 import { vec2 } from "gl-matrix";
 
 
+
 type Context = CanvasRenderingContext2D;
 
 export class WrappedCanvas {
@@ -20,9 +21,6 @@ export class WrappedCanvas {
   constructor(public canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d");
 
-    this.putRect(vec2.fromValues(-1,-1), vec2.fromValues(1,1));
-    this.putLine(vec2.fromValues(-1,0), vec2.fromValues(1,0));
-    this.putLine(vec2.fromValues(0,-1), vec2.fromValues(0,1));
   }
 
   getCanvasSize() {
@@ -47,22 +45,53 @@ export class WrappedCanvas {
     const canvasCenter = vec2.create();
     vec2.scale(canvasCenter, canvasSize, 0.5);
 
+    let v = vec2.clone(p);
+
     //First scale up
-    let v = vec2.create();
-    vec2.scale(v, p, this.getScaleFactor());
+    vec2.scale(v, v, this.getScaleFactor());
 
     //Then flip y
     vec2.multiply(v, v, flipY);
     
-    
-    //Then translate to canvas center
+    //Then translate origin to canvas center
     vec2.add(v, v, canvasCenter);
+
+    return v;
+  }
+
+  screen2world(p: vec2) {
+    const flipY = vec2.fromValues(1, -1);
+    const canvasSize = this.getCanvasSize();
+    const canvasCenter = vec2.create();
+    vec2.scale(canvasCenter, canvasSize, 0.5);
+
+    let v = vec2.clone(p);
+
+    //First translate canvas center to origin
+    vec2.subtract(v, v, canvasCenter);
+
+    //Then flip y
+    vec2.multiply(v, v, flipY);
+
+    //finally, scale down
+    vec2.scale(v, v, 1/this.getScaleFactor());
+
     return v;
   }
 
   // =======================================================
   // Public graphics interface (WORLDSPACE)
   // =======================================================
+
+  clear() {
+    this.ctx.clearRect(0,0, this.canvas.width, this.canvas.height);
+  }
+
+  drawAxes() {
+    this.putRect(vec2.fromValues(-1,-1), vec2.fromValues(1,1));
+    this.putLine(vec2.fromValues(-1,0), vec2.fromValues(1,0));
+    this.putLine(vec2.fromValues(0,-1), vec2.fromValues(0,1));
+  }
 
   //point in worldspace, rad in pixels
   putPoint(p: vec2, radius=2, style="black") {
@@ -74,10 +103,16 @@ export class WrappedCanvas {
     this.ctx.restore();
   }
 
-  putLine(p1: vec2, p2: vec2) {
+  putLine(p1: vec2, p2: vec2, style="black") {
+    this.ctx.save();
+    this.ctx.strokeStyle=style;
+    this.ctx.lineWidth = 1.5;
+
     let v1 = this.world2screen(p1);
     let v2 = this.world2screen(p2);
     this.strokeLine(v1, v2);
+
+    this.ctx.restore();
   }
   
   // strokes a rectangle with corners at p1 and p2

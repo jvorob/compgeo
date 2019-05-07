@@ -8,12 +8,25 @@ html, body {
 .border {
   border: 1px solid black;
 }
+
+#textbox {
+    margin-top: 1em;
+    height: 5em;
+    padding: 0.1em;
+}
+
 </style>
   </head>
   <body>
     <h2>Voronoi/Delaunay finder</h2>
-    <canvas height=800 width=800 id="canvas" class="border">
-    </canvas>
+    <div class="border">
+        <canvas height=600 width=600 id="canvas">
+        </canvas>
+    </div>
+
+    <div id="textbox" class="border">
+        Text will go here
+    </div>
 
     <script type="text/javascript" src="bundle.js">
     </script>

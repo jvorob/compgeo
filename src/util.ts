@@ -28,3 +28,24 @@ export function  intStrZeroPad(n: number, width:number) {
   const zeroes = "00000000000000000000000000000000";
   return zeroes.slice(0,pad_amount) + nstr;
 }
+
+
+export function min<T>(things: T[], scorer: (thing:T)=>number) {
+  if(things.length == 0){ throw Error("min called on empty array"); }
+
+  let best_thing = things[0];
+  let best_score = scorer(things[0]);
+
+  for(let i = 1; i < things.length; i++) {
+    let score_i = scorer(things[i]);
+
+    if(score_i < best_score) 
+      { best_thing = things[i]; best_score = score_i; }
+  }
+
+  return best_thing;
+}
+
+export function max<T>(things: T[], scorer: (thing:T)=>number) {
+  return min(things, (x) => -1 * scorer(x));
+}

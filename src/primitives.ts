@@ -27,6 +27,16 @@ export function left(a: vec2, b: vec2, c:vec2) {
 
 
 
+export function distPointToLine(pt: vec2, a: vec2, b:vec2){
+  // Returns the perpendicular distance of pt to line ab
+  // left test gives signed distance, except its multiplied by a factor of len(b-a)
+  // need to divide by len(b-a) = sqrt(x^2 + y^2)
+  const squaredLen = (b[0]-a[0])*(b[0]-a[0])  +  (b[1]-a[1])*(b[1]-a[1]);
+  return Math.abs(left(a,b,pt)) / Math.sqrt(squaredLen);
+}
+
+
+
 
 // returns pseudoangle of a vector x,y
 // pseudoangle is [0,4) on angle = [0,2pi)

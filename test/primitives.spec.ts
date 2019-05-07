@@ -1,6 +1,6 @@
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "../src/util";
-import { left, pseudoAngle, vecAngle, 
+import { left, distPointToLine, pseudoAngle, vecAngle, 
   orientPseudoAngle, orientPseudoAngle_unrolled,
   pointRelToVector } from "../src/primitives";
 import { assert } from "chai";
@@ -61,6 +61,19 @@ describe('primitives', function() {
       assert.isBelow(left(o,ym,q3), 0);
       assert.isBelow(left(o,yp,q4), 0);
       assert.isBelow(left(q3,yp,ym), 0);
+    });
+  });
+
+  describe('distPointToLine', function() {
+    it("should be 1 for trivial cases", function() {
+      assert.closeTo(distPointToLine(q1, o, xp), 1, 0.0000001);
+      assert.closeTo(distPointToLine(q3, o, xp), 1, 0.0000001);
+      assert.closeTo(distPointToLine(o,  q2, q3), 1, 0.0000001);
+    });
+
+    it("should be scaled correctly", function() {
+      assert.closeTo(distPointToLine(q4, o, q1), Math.SQRT2, 0.0000001);
+      assert.closeTo(distPointToLine(q4, q3, q1), Math.SQRT2, 0.0000001);
     });
   });
 

@@ -2,9 +2,18 @@ import { assert } from "chai";
 // mocha doesn't need to be imported because using mochapack???
 
 // ====== Other imports
-import { intStrZeroPad } from "../src/util";
+import { min, max, intStrZeroPad } from "../src/util";
 
 describe("util", function() {
+  describe("min/max", function() {
+    const arr = [ -1, 2, 5, -100];
+    it("should return smallest thing", function() {
+      assert.equal(min(arr, (e)=>e), -100, "min with ident is -100");
+      assert.equal(min(arr, (e)=>e*e), -1, "min with sqr is -1");
+      assert.equal(max(arr, (e)=>e), 5, "max with ident is 5");
+    });
+  });
+
   describe("intStrZeroPad", function() {
     it("should return int of string when pad=0", function() {
       assert.equal(intStrZeroPad(123.13,0), "123");

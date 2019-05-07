@@ -1,6 +1,6 @@
 import { vec2 } from "gl-matrix";
-import { left, orientPseudoAngle } from "./primitives";
-import { intStrZeroPad } from "./util";
+import { left, orientPseudoAngle, distPointToLine } from "./primitives";
+import { min, max, intStrZeroPad } from "./util";
 
 export class DCEL {
   public verts: Vertex[] = [];
@@ -40,7 +40,7 @@ export class DCEL {
     //returns a short string like  v12 or e01 or f01
     //number is index in this dcel
     //if element cant be found in dcel, return e???
-    
+
     let msg ="";
     let index: number;
     let prefix: string;
@@ -62,9 +62,9 @@ export class DCEL {
 
     let numDigits = this.edges.length > 50 ? 3:2;
     if(index < 0)
-      { return prefix + "???" }
+    { return prefix + "???" }
     else 
-      {return prefix + intStrZeroPad(index,numDigits);}
+    {return prefix + intStrZeroPad(index,numDigits);}
   }
 
   toStringElem(elem: Vertex | HalfEdge | Face): string {
@@ -74,15 +74,15 @@ export class DCEL {
     if        (elem instanceof Vertex) {
       let fmt = (f:number) => (f<0?"":" ") + f.toFixed(2);
       msg = `[${shortcode}: (${fmt(elem.v[0])},${fmt(elem.v[1])}), `+
-                            `e=${this.toId(elem.someEdgeAway)}]`;
+        `e=${this.toId(elem.someEdgeAway)}]`;
 
     } else if (elem instanceof HalfEdge) {
       msg = `[${shortcode}: o=${this.toId(elem.origin)}, ` +
-                           `t=${this.toId(elem.twin)}, `+
-                           `n=${this.toId(elem.next)}, `+
-                           `p=${this.toId(elem.prev)}, `+
-                           `f=${this.toId(elem.face)}` +
-                           "]";
+        `t=${this.toId(elem.twin)}, `+
+        `n=${this.toId(elem.next)}, `+
+        `p=${this.toId(elem.prev)}, `+
+        `f=${this.toId(elem.face)}` +
+        "]";
 
     } else if (elem instanceof Face) {
       msg = `[${shortcode}]`; //TODO make this better
@@ -98,11 +98,11 @@ export class DCEL {
     const face_str = this.faces.map(v => this.toStringElem(v)).join(",\n        ");
 
     return `DCEL{\n`+
-           ` verts= ${vert_str}` + "\n\n" +
-           ` edges= ${edge_str}` + "\n\n" +
-           ` faces= ${face_str}` + "\n" +
-           `}`;
-      
+      ` verts= ${vert_str}` + "\n\n" +
+      ` edges= ${edge_str}` + "\n\n" +
+      ` faces= ${face_str}` + "\n" +
+      `}`;
+
   }
 
   getHalfEdgeHittingRay(Va: Vertex, Vb: Vertex): HalfEdge|null {
@@ -252,6 +252,53 @@ export class DCEL {
     return E_ab;
 
   }
+
+
+
+  getFeatureAtPoint(pt: vec2, epsilon=0.01): Vertex | HalfEdge | Face | null {
+    // Returns the feature at that point in space
+    // Returns closest vertex if within epsilon of one
+    // If no vertex, returns closest edge if within epsilon of one
+    // else return face it's in or null TODO: will return null for now
+
+    //get closest vertex
+    if(this.verts.length > 0) {
+      const closestVert = min(this.verts, (vert) => vec2.dist(vert.v,pt));
+
+      if(vec2.dist(closestVert.v, pt) < epsilon) {
+        return closestVert;
+      }
+    }
+
+
+    // ======== EDGES
+    function edge_dist (edge:HalfEdge) {
+      const [p1, p2] = edge.getPoints();
+      return distPointToLine(pt, p1, p2);
+    }
+
+    //no closest vertex, try for an edge
+    if(this.edges.length > 0) {
+      const closestEdge = min(this.edges, edge_dist);
+
+      if(edge_dist(closestEdge) < epsilon) {
+        //figure out which half-edge it is
+        //halfedges have a face on their left
+        
+        const [p1, p2] = closestEdge.getPoints();
+        if(left(p1, p2, pt) >= 0) {
+          return closestEdge;
+        } else {
+          return closestEdge.twin;
+        }
+      }
+    }
+
+    //TODO: check which face it's in
+
+
+    return null;
+  }
 }
 
 
@@ -280,12 +327,14 @@ export class HalfEdge {
   }
 
   toString():string { return this.dcel.toStringElem(this); }
+
+  getPoints(): [vec2, vec2] { return [this.origin.v, this.next.origin.v] }
 }
 
 export class Face {
   public outerComponent: HalfEdge | null;
   // public readonly innerComponents: HalfEdge[]; //Voronoi diagram won't have holes
-  
+
   //when putting in constructor, make it have a dcel
 }
 
@@ -319,30 +368,41 @@ function test():void {
 
 
 
-/*
+/* ROADMAP
+
+// === Primitives
+
+Point intersects face (give back inside, edge, or vertex)
+Point intersects edge?
+Line intersects edge? (at vert or interior?)
+Line intersects face (at vert, edge, or interior?)
 
 splitEdge(e1, p) //splits edge e1 into two edges around point p
 
+//for ui we want:
+getFeatureAtPosition([x,y], epsilon=0.01)
+where epsilon is the distance within which we need to be to click on a vert/edge
 
 
 
-insertEdgeToNewPoint(
+// === Elsewhere:
+client-side, draw half-edges, faces, verts, etc
+client-side, select feature by mouse position
 
-insertEdge(p1, p2)
-insertEdge(e1, e2) //use origin of edges
+//UI
+client-side, show debug info in box
+click in new points/edges
+etc
 
-insertEdge(p1,p2) {
-  //
-
-  e12 = new HEdge(p1);
-  e21 = new HEdge(p2);
-}
+// OTHER:
+how am I going to do binning?
+add intersection/degeneracy checks (for debugging) to things
 
  */
 
 
-  /*
- TRAVERSAL INVARIANTS
+/*
+ TRAVERSAL INVARIANTS? 
 
  next(e) != e //no edge to itself
 
@@ -353,4 +413,4 @@ insertEdge(p1,p2) {
  next(twin(e_toward)) !! WRONG
 
  next(twin(e_away)) = away, // goes CW around point
-   */
+ */
