@@ -1,8 +1,10 @@
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "../src/util";
-import { left, distPointToLine, pseudoAngle, vecAngle, 
+import { left, distPointToLine, 
+  lineIntersectXAxis, lineIntersectLine, segmentIntersectLine,
+  pseudoAngle, vecAngle, 
   orientPseudoAngle, orientPseudoAngle_unrolled,
-  pointRelToVector } from "../src/primitives";
+  pointRelToVector, getCoordRelToVector } from "../src/primitives";
 import { assert } from "chai";
 // mocha doesn't need to be imported because using mochapack???
 
@@ -11,6 +13,8 @@ function assertVecEqual(va: vec2, vb:vec2) {
   let msg = `Expected ${v2ToString(va)} to equal ${v2ToString(vb)}`;
   assert(vec2.equals(va,vb), msg);
 }
+
+let VEC = vec2.fromValues;
 
 
 describe('primitives', function() {
@@ -77,6 +81,22 @@ describe('primitives', function() {
     });
   });
 
+
+  describe('lineInterceptXAxis', function() {
+    it("should be 1 for trivial cases", function() {
+      assert.closeTo(distPointToLine(q1, o, xp), 1, 0.0000001);
+      assert.closeTo(distPointToLine(q3, o, xp), 1, 0.0000001);
+      assert.closeTo(distPointToLine(o,  q2, q3), 1, 0.0000001);
+    });
+
+    it("should be scaled correctly", function() {
+      assert.closeTo(distPointToLine(q4, o, q1), Math.SQRT2, 0.0000001);
+      assert.closeTo(distPointToLine(q4, q3, q1), Math.SQRT2, 0.0000001);
+    });
+  });
+
+
+
   describe('pseudoangle', function() {
     it("should return 0 for points on +x", function() {
       assert.equal(pseudoAngle(1,0), 0);
@@ -99,6 +119,49 @@ describe('primitives', function() {
     //TODO: fancier tests for monotonicity?
   });
 
+  describe('lineIntersectXAxis', function() {
+    it("should behave as expected", function() {
+      assert.equal(lineIntersectXAxis(VEC(-1,-1),VEC( 1, 1)),  0);
+      assert.equal(lineIntersectXAxis(VEC( 0,-2),VEC( 2, 2)),  1);
+      assert.equal(lineIntersectXAxis(VEC(-4, 2),VEC(-1,-4)), -3);
+    });
+    it("should work for verticals", function() {
+      assert.equal(lineIntersectXAxis(VEC(-1,-1),VEC(-1, 1)), -1);
+    });
+    it("should null for horizontals", function() {
+      assert.equal(lineIntersectXAxis(VEC(-1,-1),VEC(-3,-1)), null);
+    });
+  });
+
+  describe('lineIntersectLine', function() {
+    it("should behave as expected", function() {
+      assertVecEqual(lineIntersectLine(q1, q3,   q2, q4),  o);
+      assertVecEqual(lineIntersectLine(q2, ym,   xm, xp),  VEC(-0.5,0));
+      assertVecEqual(lineIntersectLine(xp, xm,   q2, ym),  VEC(-0.5,0));
+    });
+    it("should null if parallel", function() {
+      assert.equal(lineIntersectLine(q2, q4,   xp, yp),  null);
+    });
+  });
+
+  describe('segmentIntersectLine', function() {
+    it("should behave as expected", function() {
+      assertVecEqual(segmentIntersectLine(q2, q4,   q1, q3),  o);
+      assertVecEqual(segmentIntersectLine(q4, q2,   q1, q3),  o);
+      assertVecEqual(segmentIntersectLine(q3, q1,   q4, q2),  o);
+      assertVecEqual(segmentIntersectLine(q3, q1,   q2, q4),  o);
+
+      assertVecEqual(segmentIntersectLine(ym, q1,   yp, q4),  VEC(0.5,0));
+    });
+    it("should not intersect if doesnt reach", function() {
+      assert.equal(segmentIntersectLine(q1,  o,   xm, ym),  null);
+      assert.equal(segmentIntersectLine(xm, ym,   q4, q1),  null);
+    });
+    it("should work with endpoints", function() {
+      assertVecEqual(segmentIntersectLine(q1,  o,   q2, q4),  o);
+      assertVecEqual(segmentIntersectLine(xm, ym,   ym, yp),  ym);
+    });
+  });
 
   describe('vecAngle', function() {
     // given a, b, c
@@ -186,6 +249,31 @@ describe('primitives', function() {
       assertVecEqual(pointRelToVector(ym, xp, 1, 0), xp);
       assertVecEqual(pointRelToVector(ym, xp, 0, 1), xm);
       assertVecEqual(pointRelToVector(ym, xp,.5,.5), o);
+    });
+  });
+
+  describe('getCoordRelToVector', function() {
+    it("when relative to origin,+x, it should be normal", function() {
+      assertVecEqual(getCoordRelToVector(o, xp, o ), vec2.fromValues( 0, 0));
+      assertVecEqual(getCoordRelToVector(o, xp, xp), vec2.fromValues( 1, 0));
+      assertVecEqual(getCoordRelToVector(o, xp, yp), vec2.fromValues( 0, 1));
+      assertVecEqual(getCoordRelToVector(o, xp, q3), vec2.fromValues(-1,-1));
+    });
+    it("works with shift", function() {
+      assertVecEqual(getCoordRelToVector(xm, o, xm), vec2.fromValues( 0, 0));
+      assertVecEqual(getCoordRelToVector(xm, o, o ), vec2.fromValues( 1, 0));
+      assertVecEqual(getCoordRelToVector(xm, o, q2), vec2.fromValues( 0, 1));
+      assertVecEqual(getCoordRelToVector(xm, o, q1), vec2.fromValues( 2, 1));
+    });
+    it("works with rotate", function() {
+      assertVecEqual(getCoordRelToVector(ym, xp, ym), vec2.fromValues( 0, 0));
+      assertVecEqual(getCoordRelToVector(ym, xp, xp), vec2.fromValues( 1, 0));
+      assertVecEqual(getCoordRelToVector(ym, xp, xm), vec2.fromValues( 0, 1));
+      assertVecEqual(getCoordRelToVector(ym, xp, o ), vec2.fromValues(.5,.5));
+    });
+
+    it("should work with other things", function() {
+      assertVecEqual(getCoordRelToVector(q3,q1,  q2), VEC(0.5, .5));
     });
   });
 

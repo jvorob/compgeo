@@ -13,7 +13,10 @@ export function genRandomPoint(): vec2 {
 }
 
 
-export function v2ToString(v: vec2) { return `(${v[0].toPrecision(3)}, ${v[1].toPrecision(3)})`; }
+export function v2ToString(v: vec2) { 
+  if(v == null) { return "(null)"; }
+  return `(${v[0].toPrecision(3)}, ${v[1].toPrecision(3)})`; }
+
 function pointListToString(v: vec2[]) {
   return `List (n=${v.length}):\n` + v.map(v2ToString).join("\n") + ";";
 }
