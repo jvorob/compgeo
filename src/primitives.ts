@@ -3,8 +3,8 @@ import {v2ToString } from "./util";
 
 
 //might want these different sometime?
-const DIST_EPSILON = 0.000000001;
-const CALC_EPSILON = 0.000000001;
+export const DIST_EPSILON = 0.000000001;
+export const CALC_EPSILON = 0.000000001;
 
 
 //given 3 points ABC
@@ -32,6 +32,9 @@ export function left(a: vec2, b: vec2, c:vec2) {
 }
 
 
+export function pointsClose(a: vec2, b: vec2) {
+  return vec2.dist(a,b) < DIST_EPSILON;
+}
 
 export function distPointToLine(pt: vec2, a: vec2, b:vec2){
   // Returns the perpendicular distance of pt to line ab

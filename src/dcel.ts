@@ -1,5 +1,5 @@
 import { vec2 } from "gl-matrix";
-import { left, orientPseudoAngle, distPointToSeg } from "./primitives";
+import { pointsClose, DIST_EPSILON, left, orientPseudoAngle, distPointToSeg } from "./primitives";
 import { min, max, intStrZeroPad } from "./util";
 
 
@@ -446,6 +446,72 @@ export class HalfEdge {
   toString():string { return this.dcel.toStringElem(this); }
 
   getPoints(): [vec2, vec2] { return [this.origin.v, this.next.origin.v] }
+
+  split(pt: vec2): HalfEdge | null {
+    //splits edge at pt, insert two half-edges
+    //check that pt is on edge and not at verts
+    // returns edge pointing at midpoint
+    //     e_1    e_2         |
+    //     ->       ->       |
+    //   a - - mid- - - b    |
+    //     <-       <-       |
+    //    et_1     et_2
+    //
+    // this becomes e_1
+    //
+    // if degenerate returns null
+    
+
+    console.log("splitting");
+
+    //======= Check that it's on line but not on verts
+    const [v1, v2] = this.getPoints();
+    if(pointsClose(v1, pt) || pointsClose(v2, pt)) { return null; }
+    if(distPointToSeg(pt, v1, v2) > DIST_EPSILON) { console.log("?");return null; }
+    console.log("checkspassed");
+
+    //Now all is well
+    const a = this.origin;
+    const b = this.next.origin
+
+    let mid = new Vertex(pt[0], pt[1], this.dcel);
+    let e_2 = new HalfEdge(this.dcel);
+    let et_2 = new HalfEdge(this.dcel);
+
+    //fix vertex
+    mid.someEdgeAway = e_2;
+
+    //this and twin will become e_1 and et_1
+    //this and twin origins have to change
+    let e_1 = this;
+    let et_1 = this.twin;
+    et_1.origin = mid;
+
+    console.log(e_1.toString());
+    console.log(et_1.toString());
+
+    // Make new edges, set origin, twin, set faces
+    e_2.origin  = mid; e_2.twin  = et_2; e_2.face  = this.face;
+    et_2.origin = b  ; et_2.twin = e_2 ; et_2.face = this.twin.face;
+
+    //e1 and twin are still spliced around a
+    //e2 and twin get spliced around b
+    HalfEdge.linkEdges(e_2,this.next);
+    HalfEdge.linkEdges(this.twin.prev, et_2);
+
+    //link in the middle
+    HalfEdge.linkEdges(e_1,e_2);
+    HalfEdge.linkEdges(et_2,et_1);
+
+    //add everything
+    this.dcel.edges.push(e_2);
+    this.dcel.edges.push(et_2);
+    this.dcel.verts.push(mid);
+  }
+
+  static linkEdges(e1:HalfEdge, e2: HalfEdge) {
+      //connects next and prev pointers for e1->e2
+      e1.next = e2; e2.prev = e1; }
 }
 
 export class Face {

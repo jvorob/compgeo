@@ -31,6 +31,8 @@ class VoronoiTester {
     this.dcel.initializeBox();
 
     this.dcel.insertEdge(this.dcel.verts[0], this.dcel.verts[2]);
+    this.dcel.edges[2].split(vec2.fromValues(0.8, 0.5));
+
     console.log(this.dcel.toString());
 
 

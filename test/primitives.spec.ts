@@ -1,6 +1,6 @@
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "../src/util";
-import { left, distPointToLine, 
+import { left, distPointToLine, distPointToSeg,
   lineIntersectXAxis, lineIntersectLine, segmentIntersectLine,
   pseudoAngle, vecAngle, 
   orientPseudoAngle, orientPseudoAngle_unrolled,
@@ -73,6 +73,23 @@ describe('primitives', function() {
       assert.closeTo(distPointToLine(q1, o, xp), 1, 0.0000001);
       assert.closeTo(distPointToLine(q3, o, xp), 1, 0.0000001);
       assert.closeTo(distPointToLine(o,  q2, q3), 1, 0.0000001);
+    });
+
+    it("should be scaled correctly", function() {
+      assert.closeTo(distPointToLine(q4, o, q1), Math.SQRT2, 0.0000001);
+      assert.closeTo(distPointToLine(q4, q3, q1), Math.SQRT2, 0.0000001);
+    });
+  });
+
+  describe('distPointToSeg', function() {
+    it("should work for endpoints", function() {
+      assert.closeTo(distPointToSeg(xp, q2, o), 1, 0.0000001);
+      assert.closeTo(distPointToSeg(q3, yp, o), Math.SQRT2, 0.0000001);
+      assert.closeTo(distPointToSeg(q2, xm,ym), 1, 0.0000001);
+      assert.closeTo(distPointToSeg(ym,  o,yp), 1, 0.0000001);
+    });
+    it("should work for middle", function() {
+      assert.closeTo(distPointToSeg(q1, q2, q4), Math.SQRT2, 0.0000001);
     });
 
     it("should be scaled correctly", function() {
