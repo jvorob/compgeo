@@ -31,6 +31,7 @@ class VoronoiTester {
     this.dcel.initializeBox();
 
     this.dcel.insertEdge(this.dcel.verts[0], this.dcel.verts[2]);
+    console.log(this.dcel.toString());
 
 
     this.canvas.canvas.addEventListener("mousemove", e=>this.handleMouseMove(e));

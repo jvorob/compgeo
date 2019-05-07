@@ -2,12 +2,118 @@ import { vec2 } from "gl-matrix";
 import { left, orientPseudoAngle, distPointToSeg } from "./primitives";
 import { min, max, intStrZeroPad } from "./util";
 
+
+// ======= Utility methods
+type Stepper = (e:HalfEdge) => HalfEdge;
+type Reducer<T> = (accum: T, curr_edge: HalfEdge) => T;
+type Action<T> = (curr_edge:HalfEdge) => T;
+
+function edgeWalkReduce<T>(start_edge: HalfEdge, step: Stepper, reduce: Reducer<T>, init: T) {
+  //walks edges using step(e)
+  //calls reduce once on each edge, accumulating values
+  
+  let curr_e = start_edge;
+  let accum = init;
+  while(true) {
+    //call reduce
+    accum = reduce(accum, curr_e);
+
+    //move to next e or terminate
+    curr_e = step(curr_e);
+    if(curr_e == start_edge) 
+      { break; }
+  } 
+  return accum;
+}
+
+function edgeWalkForEach<T>(start_edge: HalfEdge, step: Stepper, doThing: Action<T>) {
+  //walks edges using step(e)
+  //calls action on each
+  
+  let curr_e = start_edge;
+  while(true) {
+    //call reduce
+    doThing(curr_e);
+
+    //move to next e or terminate
+    curr_e = step(curr_e);
+    if(curr_e == start_edge) 
+      { break; }
+  } 
+}
+
+type Comparator = (a: HalfEdge, b: HalfEdge) => number;
+function edgeWalkMin<T>(start_edge: HalfEdge, step:Stepper, compare: Comparator) {
+  //walks all edges on a component
+  //compare returns >0 if a > b
+  //keeps min
+  //returns the edge that was min
+  
+  //reduce should keep best value so far
+  function reduceKeepMin(acc: HalfEdge,  e:HalfEdge): HalfEdge {
+    const best_e = acc;
+    if(compare(e, best_e) <= 0) { return e; } // if <= best, keep new
+    else { return best_e; } 
+  }
+  
+  return edgeWalkReduce(start_edge, step, reduceKeepMin, start_edge);
+}
+
+
+function canReach(start_edge: HalfEdge, step: Stepper, target: HalfEdge) {
+  const reduceHasReached = (accum: boolean, curr_edge: HalfEdge) => {
+    return (accum || curr_edge == target)
+  }
+  return edgeWalkReduce(start_edge, step, reduceHasReached, false);
+}
+
+
+
+export function isInnerComponent(edge: HalfEdge): boolean {
+    // walks edge list to determine of this component is interior (i.e. face is inf)
+    // 
+    // If we take the leftmost lowermost vert encountered on the walk, it must be convex
+    // therefore innerComp would turn right, outerComp would turn left
+    
+    const start = edge;
+    let leftmost_vert = start.origin;
+
+    const stepNext = (e:HalfEdge) => e.next;
+    const compareMinLeftmost = (e1: HalfEdge, e2: HalfEdge) => {
+      const v1 = e1.origin.v;
+      const v2 = e2.origin.v;
+
+      if(v1[1] < v2[1] ||  // if v1 leftward of v2, return -1 (left is smaller)
+        (v1[1] == v2[1] && v1[0] <= v2[0])) //if x-cor tied, use ycor
+          {return -1}
+      else {return 1};
+    }
+
+    const leftmostVert_edgeAway = edgeWalkMin(edge, stepNext, compareMinLeftmost);
+  
+    //a, b, c are prev, leftmost, next
+    const lv = leftmostVert_edgeAway.origin;
+    const lv_prev = leftmostVert_edgeAway.prev.origin;
+    const lv_next = leftmostVert_edgeAway.next.origin;
+
+    //if only two halfEdges, return true, isolated edge
+    if(lv_prev == lv_next) { return true;} 
+
+    //innerComponent iff right turn
+    if(left(lv_prev.v, lv.v, lv_next.v) < 0) {return true; }
+    else {return false;}
+}
+
+
 export class DCEL {
   public verts: Vertex[] = [];
   public edges: HalfEdge[] = [];
   public faces: Face[] = [];
 
   constructor() {
+    //make the face at infinity
+    const face_inf = new Face(this, true);
+    this.faces.push(face_inf);
   }
 
   //Sets up DCEL for initial box
@@ -85,7 +191,8 @@ export class DCEL {
         "]";
 
     } else if (elem instanceof Face) {
-      msg = `[${shortcode}]`; //TODO make this better
+      const infStr= elem.isInf ? " inf" : "";
+      msg = `[${shortcode}:${infStr} e=${this.toId(elem.someEdge)}]`;
 
     }
 
@@ -118,48 +225,26 @@ export class DCEL {
     //     /     \        |
 
     const e_away = Va.someEdgeAway;
-    if(e_away == null) {
-      //No edges at point
-      return null;
-    }
+    if(e_away == null) { return null; } // no edges
 
     const first_e_towards = e_away.prev;
 
+    // find the one with min angle relative to a->b (immediately left of b coming in)
 
+    //walk clockwise around vectors incoming to point
+    const step = (edge_in:HalfEdge) => edge_in.next.twin;
 
-    // We want to walk all incoming vectors, and find the one with min angle relative to a->b
-    // (immediately left of b)
+    //want smallest pseudo angle of (a, b, edge)
+    const compareMinAngle = (e1: HalfEdge, e2:HalfEdge) => { 
+      const a1 = orientPseudoAngle(Va.v, Vb.v, e1.origin.v); 
+      const a2 = orientPseudoAngle(Va.v, Vb.v, e2.origin.v); 
+      return a1 - a2;
+    }
 
-
-    let curr_e = first_e_towards; //edge pointing towards Va
-    let best_e = curr_e;
-    let min_angle = orientPseudoAngle(Va.v, Vb.v, curr_e.origin.v);  //pseudoangle is always 0..4
-
-    //console.log("halfEdgeHitting ray, found some edges, starting at " + curr_e.toString());
-    while(true) {
-      let e_angle = orientPseudoAngle(Va.v, Vb.v, curr_e.origin.v);
-      //get pseudoangle from VaVb ccw towards e
-      //falls in range 0-2 is left, 2-4 is right
-      //we want the largest pseudoangle
-
-
-      //console.log("STEP: =======");
-      //console.log(`e: ${curr_e.toString()}, ang: ${e_angle} | best:${best_e.toString()}, ${min_angle}`);
-
-      //keep track of min
-      if(e_angle <= min_angle) 
-      { best_e = curr_e; min_angle = e_angle; }
-
-      //move to next e or terminate
-      curr_e = curr_e.next.twin;
-      if(curr_e == first_e_towards) 
-      { break; }
-    } 
+    return edgeWalkMin(first_e_towards, step, compareMinAngle);
 
     //console.log("DONE!");
     //console.log(`best:${best_e.toString()}, ${min_angle}`);
-
-    return best_e;
   }
 
   insertEdge(Va: Vertex, Vb: Vertex) {
@@ -241,9 +326,32 @@ export class DCEL {
     spliceEdgesAround(Vb, Eb, E_ba, E_ab);
 
     // =============== FIX UP FACES =============
-    // TODO !!!!
-    // walk from E_ab. If we run into E_ba before coming around, then faces are connected
-    // else need to split
+    
+    // ===  Set face on new edges
+    
+    if(this.edges.length == 0) { //first face, add to inf
+      this.faces[0].someEdge = E_ab;
+      E_ab.face = E_ba.face = this.faces[0];
+
+    } else { //
+      if(E_ab.next == E_ab.prev) { // we can't have unconnected edges except for the first one
+        throw Error("Can't insert unconnected edges after the first"); }
+
+      if(E_ab.next == E_ba) { //get face from neighbor, make sure it's not twin
+        E_ab.face = E_ab.prev.face;
+        E_ba.face = E_ba.next.face;
+
+      } else { //E_ab.next != E_ba
+        E_ab.face = E_ab.next.face;
+        E_ba.face = E_ba.prev.face;
+      }
+    }
+
+
+    // == Check if we need to split
+    if(!canReach(E_ab, (e)=>e.next, E_ab.twin)){
+      Face.splitAt(E_ab);
+    }
 
     // ====== Insert into arrays
     this.edges.push(E_ab);
@@ -254,6 +362,12 @@ export class DCEL {
   }
 
 
+  // ===================================================
+  //                     FACE METHODS
+  // ===================================================
+  
+
+  // ================= ETC
 
   getFeatureNearPoint(pt: vec2, epsilon=0.01): Vertex | HalfEdge | Face | null {
     // Returns the feature at that point in space
@@ -332,10 +446,53 @@ export class HalfEdge {
 }
 
 export class Face {
-  public outerComponent: HalfEdge | null;
-  // public readonly innerComponents: HalfEdge[]; //Voronoi diagram won't have holes
+  public someEdge: HalfEdge | null;
+  // public readonly innerComponents: HalfEdge[]; //Voronoi diagram won't have holes, dont need this
+  public readonly isInf: boolean; //Set to true on the face at infinity
 
-  //when putting in constructor, make it have a dcel
+  constructor(public dcel: DCEL, isInf = false) {
+    this.isInf = isInf;
+  }
+
+  static splitAt(edge: HalfEdge) {
+    // Splits face into two faces and assign to edges
+    
+
+    let face_ab: Face;
+    let face_ba: Face;
+
+    let new_face = new Face(edge.dcel);
+    edge.dcel.faces.push(new_face);
+    
+    // ============= Figure out which face should be on which half_edge
+    if(edge.face.isInf) { //if one face is inf, need to assign it appropriately
+      const ab_inner = isInnerComponent(edge);
+      const ba_inner = isInnerComponent(edge.twin);
+
+      if(ab_inner && ba_inner){
+        //cant both be same
+        throw(Error("splitting the face at inf cant make two inner or outer"));
+
+      } else if (ab_inner) { // ab innner means ab gets inf face
+        face_ab = edge.face;
+        face_ba = new_face;
+      } else { //ba_inner
+        face_ab = new_face;
+        face_ba = edge.face;
+      }
+    } else {
+
+      face_ab = edge.face;
+      face_ba = new_face;
+    }
+
+    //Assign edges to faces
+    face_ab.someEdge = edge;
+    face_ba.someEdge = edge.twin;
+    //Assign face to edges
+    edgeWalkForEach(edge,      e=>e.next, e=>{e.face = face_ab});
+    edgeWalkForEach(edge.twin, e=>e.next, e=>{e.face = face_ba});
+  }
 }
 
 

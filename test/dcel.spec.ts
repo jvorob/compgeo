@@ -5,7 +5,7 @@ import { assert } from "chai";
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "../src/util";
 //import { left, pseudoAngle, vecAngle, orientPseudoAngle, orientPseudoAngle_unrolled } from "../src/primitives";
-import { DCEL, HalfEdge, Vertex, Face } from "../src/dcel";
+import { isInnerComponent, DCEL, HalfEdge, Vertex, Face } from "../src/dcel";
 
 
 
@@ -73,6 +73,7 @@ describe("dcel", function() {
 describe("dcel with test graph", function() {
   let v: Vertex[] = [];
   let e: HalfEdge[] = [];
+  let f: Face[] = [];
   let dcel: DCEL;
 
   //
@@ -85,6 +86,7 @@ describe("dcel with test graph", function() {
     dcel = new DCEL();
     v=[];
     e=[];
+    f = dcel.faces;
 
     v[0] = new Vertex( r, r, dcel);
     v[1] = new Vertex(-r, r, dcel);
@@ -108,6 +110,11 @@ describe("dcel with test graph", function() {
     v[2].someEdgeAway = e[2];
     v[3].someEdgeAway = e[4];
 
+    // ======== Link edges to face at inf
+    f[0].someEdge = e[0];
+    e.forEach(e => e.face = f[0]);
+    
+
     // ============= Link edges to each other
     function twinEdges(e1:HalfEdge, e2: HalfEdge) {
       //connects twin pointers for e1 and e2
@@ -127,6 +134,7 @@ describe("dcel with test graph", function() {
     linkEdges(e[4],e[2]);
     linkEdges(e[2],e[0]);
     linkEdges(e[0],e[1]);
+
 
     //TODO: setup faces
   });
@@ -158,7 +166,7 @@ describe("dcel with test graph", function() {
 
   describe("toStringElem", function() {
     it("should give a long string description of edges", function() {
-      const expected = "[e00: o=v01, t=e01, n=e01, p=e02, f=null]";
+      const expected = "[e00: o=v01, t=e01, n=e01, p=e02, f=f00]";
       assert.equal(dcel.toStringElem(e[0]), expected);
     });
     it("should give a long string description of vertices", function() {
@@ -251,6 +259,22 @@ describe("dcel with test graph", function() {
       assertElemEqual(e_new.twin.next.origin, v[2], "edge goes b to a");
 
       assertElemEqual(v[4].someEdgeAway, e_new.twin, "should add edge to new point");
+    });
+  });
+
+
+
+
+  describe("face methods", function() {
+    describe("isInnerComponent", function() {
+      it("should work", function(){
+        assert.isTrue(isInnerComponent(e[0]), "test graph is innercomp");
+      });
+      it("should work if we close the graph", function(){
+        dcel.insertEdge(v[0],v[3]);
+        assert.isFalse(isInnerComponent(e[1]), "closed test graph has outercomp");
+        assert.isTrue(isInnerComponent(e[0]), "closed test graph has innercomp");
+      });
     });
   });
 });
