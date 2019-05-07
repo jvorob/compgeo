@@ -255,7 +255,7 @@ export class DCEL {
 
 
 
-  getFeatureAtPoint(pt: vec2, epsilon=0.01): Vertex | HalfEdge | Face | null {
+  getFeatureNearPoint(pt: vec2, epsilon=0.01): Vertex | HalfEdge | Face | null {
     // Returns the feature at that point in space
     // Returns closest vertex if within epsilon of one
     // If no vertex, returns closest edge if within epsilon of one

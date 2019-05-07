@@ -133,7 +133,7 @@ class VoronoiTester {
     const pt = this.canvas.screen2world(vec2.fromValues(s_x,s_y));
     //console.log(v2ToString(pt));
 
-    const feat = this.dcel.getFeatureAtPoint(pt, 0.05);
+    const feat = this.dcel.getFeatureNearPoint(pt, 0.05);
     this.textbox.textContent = (feat&&feat.toString());
 
 

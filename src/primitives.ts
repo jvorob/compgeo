@@ -2,7 +2,8 @@ import { vec2 } from "gl-matrix";
 import {v2ToString } from "./util";
 
 
-const DEFAULT_EPSILON = 0.000000001;
+//might want these different sometime?
+const DIST_EPSILON = 0.000000001;
 const CALC_EPSILON = 0.000000001;
 
 
@@ -60,6 +61,9 @@ export function distPointToSeg(pt: vec2, a: vec2, b:vec2){
 }
 
 
+export function pointIntersectPoint(a: vec2, b:vec2){
+  return vec2.equals(a,b);
+}
 
 
 export function segmentIntersectLine(s_a: vec2, s_b: vec2, l_a: vec2, l_b: vec2): vec2 | null {
