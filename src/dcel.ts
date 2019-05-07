@@ -1,10 +1,11 @@
 import { vec2 } from "gl-matrix";
 import { left, orientPseudoAngle } from "./primitives";
+import { intStrZeroPad } from "./util";
 
 export class DCEL {
   public verts: Vertex[] = [];
   public edges: HalfEdge[] = [];
-  public face: Face[] = [];
+  public faces: Face[] = [];
 
   constructor() {
   }
@@ -14,10 +15,10 @@ export class DCEL {
     let v1, v2, v3, v4: Vertex;
     let r = 0.8;
 
-    v1 = new Vertex(-r, r);
-    v2 = new Vertex( r, r);
-    v3 = new Vertex( r,-r);
-    v4 = new Vertex(-r,-r);
+    v1 = new Vertex(-r, r, this);
+    v2 = new Vertex( r, r, this);
+    v3 = new Vertex( r,-r, this);
+    v4 = new Vertex(-r,-r, this);
 
     this.verts.push(v1);
     this.verts.push(v2);
@@ -30,46 +31,131 @@ export class DCEL {
     this.insertEdge(v3,v4);
     this.insertEdge(v4,v1);
 
-    console.log(this.getHalfEdgeHittingRay(v3,v4))
-    console.log(this.getHalfEdgeHittingRay(v1,v4))
+    //console.log(this.toString(this.getHalfEdgeHittingRay(v3,v4)))
+    //console.log(this.toString(this.getHalfEdgeHittingRay(v1,v4)))
 
   }
 
-  getHalfEdgeHittingRay(Va: Vertex, Vb: Vertex): HalfEdge|null {
-  // Looks at all half-edges around Va. 
-  // Finds the half-edge whose next would be ray Va->Vb
-  // If no edges, return null
-  // Returns the half-edge pointing at Va
+  toId(elem: Vertex | HalfEdge | Face): string {
+    //returns a short string like  v12 or e01 or f01
+    //number is index in this dcel
+    //if element cant be found in dcel, return e???
     
+    let msg ="";
+    let index: number;
+    let prefix: string;
+    if(elem == null) {
+      return "null";
+    } else if (elem instanceof Vertex) {
+      index = this.verts.indexOf(elem);
+      prefix = "v";
+
+    } else if (elem instanceof HalfEdge) {
+      index = this.edges.indexOf(elem);
+      prefix = "e";
+
+    } else if (elem instanceof Face) {
+      index = this.faces.indexOf(elem);
+      prefix = "f";
+
+    } else { throw Error("Unknown type in dcel.toId") }
+
+    let numDigits = this.edges.length > 50 ? 3:2;
+    if(index < 0)
+      { return prefix + "???" }
+    else 
+      {return prefix + intStrZeroPad(index,numDigits);}
+  }
+
+  toStringElem(elem: Vertex | HalfEdge | Face): string {
+    let msg = "";
+    const shortcode = this.toId(elem);
+
+    if        (elem instanceof Vertex) {
+      let fmt = (f:number) => (f<0?"":" ") + f.toFixed(2);
+      msg = `[${shortcode}: (${fmt(elem.v[0])},${fmt(elem.v[1])}), `+
+                            `e=${this.toId(elem.someEdgeAway)}]`;
+
+    } else if (elem instanceof HalfEdge) {
+      msg = `[${shortcode}: o=${this.toId(elem.origin)}, ` +
+                           `t=${this.toId(elem.twin)}, `+
+                           `n=${this.toId(elem.next)}, `+
+                           `p=${this.toId(elem.prev)}, `+
+                           `f=${this.toId(elem.face)}` +
+                           "]";
+
+    } else if (elem instanceof Face) {
+      msg = `[${shortcode}]`; //TODO make this better
+
+    }
+
+    return msg;
+  }
+
+  toString(): string {
+    const vert_str = this.verts.map(v => this.toStringElem(v)).join(",\n        ");
+    const edge_str = this.edges.map(v => this.toStringElem(v)).join(",\n        ");
+    const face_str = this.faces.map(v => this.toStringElem(v)).join(",\n        ");
+
+    return `DCEL{\n`+
+           ` verts= ${vert_str}` + "\n\n" +
+           ` edges= ${edge_str}` + "\n\n" +
+           ` faces= ${face_str}` + "\n" +
+           `}`;
+      
+  }
+
+  getHalfEdgeHittingRay(Va: Vertex, Vb: Vertex): HalfEdge|null {
+    // Looks at all half-edges around Va. 
+    // Finds the half-edge whose next would be ray Va->Vb
+    // If no edges, return null
+    // Returns the half-edge pointing at Va
+    //        |           |
+    //        |           |
+    //        a- - - - -b |
+    //       / \          |
+    //      /   \^        |
+    //     /     \ein     |
+
     const e_away = Va.someEdgeAway;
     if(e_away == null) {
       //No edges at point
       return null;
     }
-    
+
     const first_e_towards = e_away.prev;
 
 
-    let e = first_e_towards; //edge pointing towards Va
 
-    let best_e = e;
-    let min_angle = 5;  //pseudoangle is always 0..4
+    // We want to walk all incoming vectors, and find the one with max angle relative to a->b
 
+    let curr_e = first_e_towards; //edge pointing towards Va
+    let best_e = curr_e;
+    let max_angle = 0;  //pseudoangle is always 0..4
+
+    //console.log("halfEdgeHitting ray, found some edges, starting at " + curr_e.toString());
     while(true) {
-      let e_angle = orientPseudoAngle(Va.v, Vb.v, e.origin.v);
+      let e_angle = orientPseudoAngle(Va.v, Vb.v, curr_e.origin.v);
       //get pseudoangle from VaVb ccw towards e
       //falls in range 0-2 is left, 2-4 is right
-      //we want the smallest pseudoangle
+      //we want the largest pseudoangle
       
+
+      //console.log("STEP: =======");
+      //console.log(`e: ${curr_e.toString()}, ang: ${e_angle} | best:${best_e.toString()}, ${max_angle}`);
+
       //keep track of min
-      if(e_angle < min_angle) 
-        { best_e = e; min_angle = e_angle; }
+      if(e_angle > max_angle) 
+      { best_e = curr_e; max_angle = e_angle; }
 
       //move to next e or terminate
-      e = e.next.twin;
-      if(e == first_e_towards) 
-        { break; }
+      curr_e = curr_e.next.twin;
+      if(curr_e == first_e_towards) 
+      { break; }
     } 
+
+    //console.log("DONE!");
+    //console.log(`best:${best_e.toString()}, ${max_angle}`);
 
     return best_e;
   }
@@ -100,14 +186,14 @@ export class DCEL {
     //                          Eb                       |
     //                                                   |
     //Ea and Eb are found by calling getHalfEdgeHittingRay
-    
+
 
     // ============ CHECK IF EDGES INTERSECT
     // !!!!!!!! TODO  !!!!!!!!!!!!
 
     // Make two twinned half-edges
-    let E_ab = new HalfEdge();
-    let E_ba = new HalfEdge();
+    let E_ab = new HalfEdge(this);
+    let E_ba = new HalfEdge(this);
 
     E_ab.twin = E_ba;
     E_ba.twin = E_ab;
@@ -115,16 +201,16 @@ export class DCEL {
     E_ab.origin = Va;
     E_ba.origin = Vb;
 
-    
+
     // =============== SPLICE IN NEXT/PREV =============
     // (also attaches edge to vertex if empty)
 
     function linkEdges(e1:HalfEdge, e2: HalfEdge) {
       //connects next and prev pointers for e1->e2
-       e1.next = e2; e2.prev = e1; }
+      e1.next = e2; e2.prev = e1; }
 
     function spliceEdgesAround(V: Vertex, incoming_edge: HalfEdge,
-                              new_away: HalfEdge, new_towards: HalfEdge) {
+      new_away: HalfEdge, new_towards: HalfEdge) {
       //          \ \ incoming_edge            |
       //         \ \ >                       |
       //            \      => new_away       |
@@ -132,15 +218,17 @@ export class DCEL {
       //          > /      <= new_towards    |
       //         / / /                       |
       //          / < incoming_edge.next     |
-     
+
       if(incoming_edge == null) {
         // Vertex has no edges, so new ones just wrap around
         linkEdges(new_towards, new_away); 
-        Va.someEdgeAway = E_ab; //Also need to add edge to formerly-empty point
-        
+        V.someEdgeAway = new_away; //Also need to add edge to formerly-empty point
+        //console.log(`splicing around empty vertex ${V.toString()}`);
+
       } else { //link things up normally
         linkEdges(new_towards, incoming_edge.next);
         linkEdges(incoming_edge, new_away);
+        //console.log(`splicing around edged vertex ${V.toString()}`);
       }
     }
 
@@ -169,10 +257,12 @@ export class Vertex {
   public v: vec2;
   public someEdgeAway: HalfEdge | null; //Returns an edge whose origin is v, is null iff no edges
 
-  constructor(x: number, y:number) {
+  constructor(x: number, y:number, public dcel:DCEL) {
     this.v = vec2.fromValues(x,y);
     this.someEdgeAway = null;
   }
+
+  toString():string { return this.dcel.toStringElem(this); }
 }
 
 export class HalfEdge {
@@ -183,13 +273,17 @@ export class HalfEdge {
 
   public face: Face;
 
-  constructor() {
+  constructor(public dcel:DCEL) {
   }
+
+  toString():string { return this.dcel.toStringElem(this); }
 }
 
 export class Face {
   public outerComponent: HalfEdge | null;
   // public readonly innerComponents: HalfEdge[]; //Voronoi diagram won't have holes
+  
+  //when putting in constructor, make it have a dcel
 }
 
 
@@ -241,12 +335,12 @@ insertEdge(p1,p2) {
   e21 = new HEdge(p2);
 }
 
-*/
+ */
 
 
-/*
+  /*
  TRAVERSAL INVARIANTS
- 
+
  next(e) != e //no edge to itself
 
  next(e) goes ccw around face
@@ -256,4 +350,4 @@ insertEdge(p1,p2) {
  next(twin(e_toward)) !! WRONG
 
  next(twin(e_away)) = away, // goes CW around point
- */
+   */

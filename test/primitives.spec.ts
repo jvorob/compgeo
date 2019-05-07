@@ -2,9 +2,9 @@ import { vec2 } from "gl-matrix";
 import { v2ToString } from "../src/util";
 import { left, pseudoAngle, vecAngle, orientPseudoAngle, orientPseudoAngle_unrolled } from "../src/primitives";
 import { assert } from "chai";
-
-
 // mocha doesn't need to be imported because using mochapack???
+
+
 
 describe('primitives', function() {
   //          +y                     |
