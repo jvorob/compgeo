@@ -3,8 +3,8 @@ import {v2ToString } from "./util";
 
 
 //might want these different sometime?
-export const DIST_EPSILON = 0.000000001;
-export const CALC_EPSILON = 0.000000001;
+export const DIST_EPSILON = 0.000001; //32-bit floats have ~6 decimal digits of precision
+export const CALC_EPSILON = 0.000001; //This might be ok as long as we're near the unit square
 
 
 //given 3 points ABC
@@ -63,10 +63,6 @@ export function distPointToSeg(pt: vec2, a: vec2, b:vec2){
   return distPointToLine(pt, a, b);
 }
 
-
-export function pointIntersectPoint(a: vec2, b:vec2){
-  return vec2.equals(a,b);
-}
 
 
 export function segmentIntersectLine(s_a: vec2, s_b: vec2, l_a: vec2, l_b: vec2): vec2 | null {

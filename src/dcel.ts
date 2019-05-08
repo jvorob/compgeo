@@ -1,6 +1,7 @@
 import { vec2 } from "gl-matrix";
-import { pointsClose, DIST_EPSILON, left, orientPseudoAngle, distPointToSeg } from "./primitives";
-import { min, max, intStrZeroPad } from "./util";
+import { pointsClose, segmentIntersectLine, distPointToLine,
+  DIST_EPSILON, left, orientPseudoAngle, distPointToSeg } from "./primitives";
+import { v2ToString, min, max, intStrZeroPad } from "./util";
 
 
 // ======= Utility methods
@@ -11,7 +12,7 @@ type Action<T> = (curr_edge:HalfEdge) => T;
 function edgeWalkReduce<T>(start_edge: HalfEdge, step: Stepper, reduce: Reducer<T>, init: T) {
   //walks edges using step(e)
   //calls reduce once on each edge, accumulating values
-  
+
   let curr_e = start_edge;
   let accum = init;
   while(true) {
@@ -21,7 +22,7 @@ function edgeWalkReduce<T>(start_edge: HalfEdge, step: Stepper, reduce: Reducer<
     //move to next e or terminate
     curr_e = step(curr_e);
     if(curr_e == start_edge) 
-      { break; }
+    { break; }
   } 
   return accum;
 }
@@ -29,7 +30,7 @@ function edgeWalkReduce<T>(start_edge: HalfEdge, step: Stepper, reduce: Reducer<
 export function edgeWalkForEach<T>(start_edge: HalfEdge, step: Stepper, doThing: Action<T>) {
   //walks edges using step(e)
   //calls action on each
-  
+
   let curr_e = start_edge;
   while(true) {
     //call reduce
@@ -38,7 +39,7 @@ export function edgeWalkForEach<T>(start_edge: HalfEdge, step: Stepper, doThing:
     //move to next e or terminate
     curr_e = step(curr_e);
     if(curr_e == start_edge) 
-      { break; }
+    { break; }
   } 
 }
 
@@ -48,14 +49,14 @@ function edgeWalkMin<T>(start_edge: HalfEdge, step:Stepper, compare: Comparator)
   //compare returns >0 if a > b
   //keeps min
   //returns the edge that was min
-  
+
   //reduce should keep best value so far
   function reduceKeepMin(acc: HalfEdge,  e:HalfEdge): HalfEdge {
     const best_e = acc;
     if(compare(e, best_e) <= 0) { return e; } // if <= best, keep new
     else { return best_e; } 
   }
-  
+
   return edgeWalkReduce(start_edge, step, reduceKeepMin, start_edge);
 }
 
@@ -70,38 +71,38 @@ function canReach(start_edge: HalfEdge, step: Stepper, target: HalfEdge) {
 
 
 export function isInnerComponent(edge: HalfEdge): boolean {
-    // walks edge list to determine of this component is interior (i.e. face is inf)
-    // 
-    // If we take the leftmost lowermost vert encountered on the walk, it must be convex
-    // therefore innerComp would turn right, outerComp would turn left
-    
-    const start = edge;
-    let leftmost_vert = start.origin;
+  // walks edge list to determine of this component is interior (i.e. face is inf)
+  // 
+  // If we take the leftmost lowermost vert encountered on the walk, it must be convex
+  // therefore innerComp would turn right, outerComp would turn left
 
-    const stepNext = (e:HalfEdge) => e.next;
-    const compareMinLeftmost = (e1: HalfEdge, e2: HalfEdge) => {
-      const v1 = e1.origin.v;
-      const v2 = e2.origin.v;
+  const start = edge;
+  let leftmost_vert = start.origin;
 
-      if(v1[1] < v2[1] ||  // if v1 leftward of v2, return -1 (left is smaller)
-        (v1[1] == v2[1] && v1[0] <= v2[0])) //if x-cor tied, use ycor
-          {return -1}
-      else {return 1};
-    }
+  const stepNext = (e:HalfEdge) => e.next;
+  const compareMinLeftmost = (e1: HalfEdge, e2: HalfEdge) => {
+    const v1 = e1.origin.v;
+    const v2 = e2.origin.v;
 
-    const leftmostVert_edgeAway = edgeWalkMin(edge, stepNext, compareMinLeftmost);
-  
-    //a, b, c are prev, leftmost, next
-    const lv = leftmostVert_edgeAway.origin;
-    const lv_prev = leftmostVert_edgeAway.prev.origin;
-    const lv_next = leftmostVert_edgeAway.next.origin;
+    if(v1[1] < v2[1] ||  // if v1 leftward of v2, return -1 (left is smaller)
+      (v1[1] == v2[1] && v1[0] <= v2[0])) //if x-cor tied, use ycor
+    {return -1}
+    else {return 1};
+  }
 
-    //if only two halfEdges, return true, isolated edge
-    if(lv_prev == lv_next) { return true;} 
+  const leftmostVert_edgeAway = edgeWalkMin(edge, stepNext, compareMinLeftmost);
 
-    //innerComponent iff right turn
-    if(left(lv_prev.v, lv.v, lv_next.v) < 0) {return true; }
-    else {return false;}
+  //a, b, c are prev, leftmost, next
+  const lv = leftmostVert_edgeAway.origin;
+  const lv_prev = leftmostVert_edgeAway.prev.origin;
+  const lv_next = leftmostVert_edgeAway.next.origin;
+
+  //if only two halfEdges, return true, isolated edge
+  if(lv_prev == lv_next) { return true;} 
+
+  //innerComponent iff right turn
+  if(left(lv_prev.v, lv.v, lv_next.v) < 0) {return true; }
+  else {return false;}
 }
 
 
@@ -326,9 +327,9 @@ export class DCEL {
     spliceEdgesAround(Vb, Eb, E_ba, E_ab);
 
     // =============== FIX UP FACES =============
-    
+
     // ===  Set face on new edges
-    
+
     if(this.edges.length == 0) { //first face, add to inf
       this.faces[0].someEdge = E_ab;
       E_ab.face = E_ba.face = this.faces[0];
@@ -365,7 +366,7 @@ export class DCEL {
   // ===================================================
   //                     FACE METHODS
   // ===================================================
-  
+
 
   // ================= ETC
 
@@ -398,7 +399,7 @@ export class DCEL {
       if(edge_dist(closestEdge) < epsilon) {
         //figure out which half-edge it is
         //halfedges have a face on their left
-        
+
         const [p1, p2] = closestEdge.getPoints();
         if(left(p1, p2, pt) >= 0) {
           return closestEdge;
@@ -460,15 +461,18 @@ export class HalfEdge {
     // this becomes e_1
     //
     // if degenerate returns null
-    
 
-    console.log("splitting");
+
+    //console.log("splitting " + this.toString() + "at " + v2ToString(pt));
 
     //======= Check that it's on line but not on verts
     const [v1, v2] = this.getPoints();
     if(pointsClose(v1, pt) || pointsClose(v2, pt)) { return null; }
-    if(distPointToSeg(pt, v1, v2) > DIST_EPSILON) { console.log("?");return null; }
-    console.log("checkspassed");
+    if(distPointToSeg(pt, v1, v2) > DIST_EPSILON) {
+      //console.log("Not at vert but far from seg");
+      //console.log(distPointToSeg(pt, v1, v2));
+      return null; }
+    //console.log("checkspassed");
 
     //Now all is well
     const a = this.origin;
@@ -480,6 +484,8 @@ export class HalfEdge {
 
     //fix vertex
     mid.someEdgeAway = e_2;
+    b.someEdgeAway = et_2;
+    //a is still ok
 
     //this and twin will become e_1 and et_1
     //this and twin origins have to change
@@ -510,8 +516,8 @@ export class HalfEdge {
   }
 
   static linkEdges(e1:HalfEdge, e2: HalfEdge) {
-      //connects next and prev pointers for e1->e2
-      e1.next = e2; e2.prev = e1; }
+    //connects next and prev pointers for e1->e2
+    e1.next = e2; e2.prev = e1; }
 }
 
 export class Face {
