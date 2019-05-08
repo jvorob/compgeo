@@ -37,6 +37,9 @@ class VoronoiTester {
 
 
     this.canvas.canvas.addEventListener("mousemove", e=>this.handleMouseMove(e));
+    
+    //for debugging
+    (window as any).dcel = this.dcel;
   }
 
   drawVert(vert: Vertex, style="black")  //radius 5 pixels
