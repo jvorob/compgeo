@@ -1,9 +1,9 @@
 import { WrappedCanvas } from "./lib";
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "./util";
-import { Integrity, edgeWalkForEach, DCEL, Vertex, HalfEdge, Face } from "./dcel";
+import { Integrity, edgeWalkForEach,  lineIntersectWalk, DCEL, Vertex, HalfEdge, Face } from "./dcel";
 import * as DCEL_module from "./dcel";
-import { left, pointRelToVector, orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
+import { left, pointRelToVector,orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
 
 
 let globalCanvas: WrappedCanvas;
@@ -35,7 +35,8 @@ class VoronoiTester {
     //for debugging
     (window as any).dcel = this.dcel;
     (window as any).integ = Integrity;
-    (window as any).dcel_module = DCEL_module
+    (window as any).dcel_module = DCEL_module;
+    (window as any).vor = this;
     this.dcel.initializeBox();
 
 
@@ -214,25 +215,29 @@ class VoronoiTester {
     let v1 = pointRelToVector(pt, face.site, 0.5, 1);
     let v2 = pointRelToVector(pt, face.site, 0.5, -1);
 
-    const intersections = face.someEdge.lineIntersectWalk(v1,v2);
-    const [e1, p1] = intersections[0];
-    const [e2, p2] = intersections[1];
+    const intersection_1 = lineIntersectWalk(face.someEdge, v1,v2);
+    if(intersection_1 == null) { throw Error("No intersections found"); }
+    //const [isVertex, elem1, p1] = int_result;
 
-    const e1_new = (e1 as HalfEdge).split(p1);
-    const e2_new = (e2 as HalfEdge).split(p2);
+    //if(!isVertex) { //need to split edge
+    //}
 
-    //split returns edge pointing at midp
-    let new_edge = this.dcel.insertEdge(e1_new.next.origin, e2_new.next.origin);
-    if(new_edge.face.site != null) { new_edge = new_edge.twin };
 
-    const new_face = new_edge.face;
-    new_face.site = pt;
+    //const e1_new = (e1 as HalfEdge).split(p1);
+    //const e2_new = (e2 as HalfEdge).split(p2);
 
-    console.log("new edge: " + new_edge.toString());
-    console.log("new face: " + new_face.toString());
+    ////split returns edge pointing at midp
+    //let new_edge = this.dcel.insertEdge(e1_new.next.origin, e2_new.next.origin);
+    //if(new_edge.face.site != null) { new_edge = new_edge.twin };
 
-    // We have one face, fix it up
-    //new edge faces new site
+    //const new_face = new_edge.face;
+    //new_face.site = pt;
+
+    //console.log("new edge: " + new_edge.toString());
+    //console.log("new face: " + new_face.toString());
+
+    //// We have one face, fix it up
+    ////new edge faces new site
     //this.doFixupEdges(new_face, new_edge);
     
   }
@@ -262,35 +267,37 @@ class VoronoiTester {
     let v1 = pointRelToVector(targetFace.site, next_site, 0.5, 1);
     let v2 = pointRelToVector(targetFace.site, next_site, 0.5, -1);
 
-    const intersections = next_face.someEdge.lineIntersectWalk(v1,v2);
-    const [e1, p1] = intersections[0];
-    const [e2, p2] = intersections[1];
+    const intersections = lineIntersectWalk(next_face.someEdge, v1,v2);
+    //const [e1, p1] = intersections[0];
+    //const [e2, p2] = intersections[1];
 
-    let next_el, next_pt;
-    function check(elem: HalfEdge|Vertex, pt: vec2) {
-      if(elem instanceof Vertex) { return false; }
-      else {next_el = elem; next_pt = pt; return true;}
-    }
+    //let next_el, next_pt;
+    //function check(elem: HalfEdge|Vertex, pt: vec2) {
+    //  if(elem instanceof Vertex) { return false; }
+    //  else {next_el = elem; next_pt = pt; return true;}
+    //}
 
-    let count = 0;
-    if(check(e1,p1))  { count++;}
-    if(check(e2,p2))  { count++;}
+    //let count = 0;
+    //if(check(e1,p1))  { count++;}
+    //if(check(e2,p2))  { count++;}
 
-    if(count == 0) {throw Error("no edges intersecting"); }
-    if(count == 2) {throw Error("two edges intersecting"); } // shuldn't happen, one is a vertex
+    //try {
+    //if(count == 0) {throw Error("no edges intersecting"); }
+    //if(count == 2) {throw Error("two edges intersecting"); } // shuldn't happen, one is a vertex
+    //} catch (e) { console.error(e); }
 
-    //split edge
-    const edge_to_split = next_el;
-    const e_new = (edge_to_split as HalfEdge).split(next_pt);
-    const new_vert = e_new.next.origin;
-    //split returns edge pointing at midp
-    
-    // insert edge
-    const last_vert = curr_e.next.origin;
-    let new_edge = this.dcel.insertEdge(last_vert, new_vert);
+    ////split edge
+    //const edge_to_split = next_el;
+    //const e_new = (edge_to_split as HalfEdge).split(next_pt);
+    //const new_vert = e_new.next.origin;
+    ////split returns edge pointing at midp
+    //
+    //// insert edge
+    //const last_vert = curr_e.next.origin;
+    //let new_edge = this.dcel.insertEdge(last_vert, new_vert);
 
-    //That's the one we just hopped
-    curr_e.next.deleteEdge();
+    ////That's the one we just hopped
+    //curr_e.next.deleteEdge();
   
   }
 }

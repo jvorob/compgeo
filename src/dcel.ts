@@ -4,7 +4,9 @@ import { pointsClose, segmentIntersectLine, distPointToLine,
 import { v2ToString, min, max, intStrZeroPad } from "./util";
 
 
-// ======= Utility methods
+// ==============================================================
+//                     TRAVERSAL QUERIES
+// ==============================================================
 type Stepper = (e:HalfEdge) => HalfEdge;
 type Reducer<T> = (accum: T, curr_edge: HalfEdge) => T;
 type Action<T> = (curr_edge:HalfEdge) => T;
@@ -108,7 +110,7 @@ export function isInnerComponent(edge: HalfEdge): boolean {
   }
 
   const leftmostVert_edgeAway = edgeWalkMin(edge, stepNext, compareMinLeftmost);
-  console.log("isInnerComponent, edge is " + leftmostVert_edgeAway);
+  //console.log("isInnerComponent, edge is " + leftmostVert_edgeAway);
 
   //a, b, c are prev, leftmost, next
   const lv = leftmostVert_edgeAway.origin;
@@ -123,13 +125,132 @@ export function isInnerComponent(edge: HalfEdge): boolean {
   else {return false;}
 }
 
+export enum IntersectType { "VERT", "DEGENERATE", "EDGE", "NONE"}
+export function edgeIntersectLineCombinatoric(edge: HalfEdge, a: vec2, b:vec2): IntersectType {
+  //Tests whether line ab intersects the edge at its interior or its origin (not the far endpoint)
+  //
+  //Returns [edge.origin, false] if line intersects only at vertex
+  //Returns [edge, true] if line intersects both vertices
+  //Returns [edge, false] if line intersects interior (vertices are left and right)
+  //
+  //Returns [null, false] if line doesn't intersect at all
+  //Returns [null, false] if line intersects vertex but is degenerate with previous edge
+  
+  const [v1, v2] = [edge.origin, edge.next.origin ];
+  const v1_on = VertOnLine(v1, a, b);
+  const v2_on = VertOnLine(v2, a, b);
+  const vprev_on = VertOnLine(edge.prev.origin, a, b);
 
-// ==================================================
-//                  PARTIAL PRIMITIVES
+  if(            !v1_on && v2_on)  { return IntersectType.NONE }        //next has intersection, dont count it
+  if(             v1_on && v2_on)  { return IntersectType.DEGENERATE }  //degenerate intersection
+  if( vprev_on && v1_on && !v2_on) { return IntersectType.NONE }        //degenerate in prev edge, dont count it here
+  if(!vprev_on && v1_on && !v2_on) { return IntersectType.VERT}         //proper vertex intersection
+
+  //ELSE: neither vertex is on the line: check if they're on opposite sides
+  const VertLeftOfLine = (v:Vertex) => { return left(a, b, v.v) > 0; }
+  if(VertLeftOfLine(v1) == VertLeftOfLine(v2)) { //Same side
+    return IntersectType.NONE
+
+  } else { //Opposite sides, edge will have intersection
+    return IntersectType.EDGE;
+  }
+}
+
+type IntersectResult = [IntersectType, HalfEdge]
+export function lineIntersectWalk(start_edge:HalfEdge, a: vec2, b: vec2): IntersectResult {
+  //walks the edges, returns the first intersection it encounters
+  //returns [elem, isDegenerate]
+  //Vertex
+  //Elem is vertex or edge if intersected
+  //Elem is null if no intersections
+  //isDgenerate is true if the edge goes along line ab
+  //
+  //
+  //starts immediately after this.origin
+  //returns a vertex if it finds ony
+  //only returns edge if strict interior intersection
+  //only returns this.origin if that is exactly the only intersection
+  //
+  //returns [isVertex, HalfEdge, intersPoint ]
+  //if isVertex is true, then the intersection occurs at HalfEdge.origin
+
+
+  const VertLeftOfLine = (v:Vertex) => { return left(a, b, v.v) > 0; }
+
+
+
+  let lastVertLeft = VertLeftOfLine(start_edge.origin);
+  let curr_e = start_edge;
+  while(true) {
+    const nextVert = curr_e.next.origin;
+
+
+    curr_e = curr_e.next;
+    if(curr_e == start_edge) { return null; } //Found no intersections
+  }
+
+  // // FANCY LOGGING
+  // //console.log("ints");
+  // //intersections.forEach(([elem, pt]) => {
+  // //  const str = "(" + elem.toString() + ", " + v2ToString(pt) + ")";
+  // //  console.log(str + ",\n");});
+
+
+  // if(filtered.length != 2) { throw Error(" should only ever have 2 intersections");}
+  // return filtered;
+
+}
+
+
+// ====================================================================================
+//
+//                              LOCAL PRIMITIVES
+//
+//
+// ====================================================================================
+
+function PointOnEdgeInterior(pt: vec2, edge: HalfEdge): vec2 | null {
+  //Returns pt if it lies on the edge
+  // else null
+  
+  const [v1, v2] = edge.getPoints();
+  if(pointsClose(v1, pt) || pointsClose(v2, pt)) { return null; }
+  if(distPointToSeg(pt, v1, v2) > DIST_EPSILON) { return null; }
+  return pt;
+}
+
+
+function VertOnLine(vert:Vertex, a: vec2, b: vec2) {
+  //Returns vert.v if on line, else null
+  
+  //TESTING:
+  const d = distPointToLine(vert.v, a, b)
+  if(d >= DIST_EPSILON && d <= 3* DIST_EPSILON) { 
+    console.error(`NEAR MISS: dist=${d}, eps=${DIST_EPSILON}`);
+  }
+
+  return (distPointToLine(vert.v, a, b) < DIST_EPSILON) ? vert.v: null;
+}
+
+function EdgeInteriorIntersectLine(e:HalfEdge, a: vec2, b: vec2) {
+  //returns point of intersection or null
+  const [v1, v2] = e.getPoints();
+
+  if(distPointToLine(v1, a, b) < DIST_EPSILON) { return null; }
+  if(distPointToLine(v2, a, b) < DIST_EPSILON) { return null; }
+  return segmentIntersectLine(v1, v2, a, b);
+}
+
+
+
+// ====================================================================================
+//
+//                              PARTIAL PRIMITIVES
 //
 // Things which can't be called on their own, but are used as
 // building blocks in more complete methods
-// ==================================================
+//
+// ====================================================================================
 
 function splitFaceAt(edge: HalfEdge) {
   // =================================
@@ -233,9 +354,12 @@ function mergeFacesAt(edge:HalfEdge) {
   edge.dcel.faces.splice(index, 1); //delete it
 }
 
-// ==================================================
+// ====================================================================================================
 //
-// ==================================================
+//
+//
+//
+// ====================================================================================================
 
 export class DCEL {
   public verts: Vertex[] = [];
@@ -461,6 +585,7 @@ export class DCEL {
     // =============== FIX UP FACES =============
 
     // ===  Set face on new edges
+    // TODO: this coul be a lot cleaner
 
     if(this.edges.length == 0) { //first face, add to inf
       this.faces[0].someEdge = E_ab;
@@ -489,11 +614,8 @@ export class DCEL {
     // ====== Insert into arrays
     this.edges.push(E_ab);
     this.edges.push(E_ba);
-
-
     console.log(`Inserted edge ${E_ab.toString()} Doing verify:`);
-    try {Integrity.verifyAll(this); } catch (e) { console.error(e); }
-
+    Integrity.verifyAll(this);
     return E_ab;
   }
 
@@ -597,18 +719,12 @@ export class HalfEdge {
     //
     // if degenerate returns null
 
-
     //console.log("splitting edge" + this + "at pt" + v2ToString(pt));
 
-    //======= Check that it's on line but not on verts
-    const [v1, v2] = this.getPoints();
-    if(pointsClose(v1, pt) || pointsClose(v2, pt)) { return null; }
-    if(distPointToSeg(pt, v1, v2) > DIST_EPSILON) {
-      //console.log("Not at vert but far from seg");
-      //console.log(distPointToSeg(pt, v1, v2));
-      return null; }
-    //console.log("checkspassed");
+    //======= Make sure we dont get a degenerate split
+    if(PointOnEdgeInterior(pt, this) == null) { return null; }
 
+    //console.log("checkspassed");
 
     //Now all is well
     const a = this.origin;
@@ -717,59 +833,6 @@ export class HalfEdge {
   }
 
 
-  lineIntersectWalk(a: vec2, b: vec2): Array<[Vertex|HalfEdge, vec2]> {
-    //walks the edges, returns all intersections it finds
-
-    let vertIntersect = (v:Vertex) => (distPointToLine(v.v, a, b) < DIST_EPSILON);
-    //returns true or false
-
-    let edgeIntersect = (e:HalfEdge) => {
-      //returns edge or null
-      const [v1, v2] = e.getPoints();
-      return segmentIntersectLine(v1, v2, a, b);
-    }
-
-    let intersections: Array<[Vertex|HalfEdge, vec2]> = [];
-
-    edgeWalkForEach(this, e=>e.next, (e:HalfEdge)=> {
-      if(vertIntersect(e.origin)) { intersections.push([e.origin, e.origin.v]);}
-
-      const e_int = edgeIntersect(e);
-      if(e_int != null) {
-        intersections.push([e, e_int]);
-      }
-    });
-
-
-
-    // ============== FILTER OUT DUPLICATE INTERSECTIONS (edge and vert)
-    const verts = intersections.map( ([elem,pt]) =>  elem instanceof Vertex ? elem : null );
-
-
-    const filtered = intersections.filter( ([elem, pt]) => {
-      if(elem instanceof Vertex) { return true; }
-      else { // Edge only stays if neither vertex is in 
-        return (verts.indexOf(elem.origin) < 0) && (verts.indexOf(elem.next.origin) < 0);
-      }});
-
-
-    // FANCY LOGGING
-    //console.log("ints");
-    //intersections.forEach(([elem, pt]) => {
-    //  const str = "(" + elem.toString() + ", " + v2ToString(pt) + ")";
-    //  console.log(str + ",\n");});
-
-    //console.log("verts");
-    //console.log(verts.map(v => v&&v.toString()));
-    console.log("Filtered Intersections " + this.toString() + ` ${v2ToString(a)}, ${v2ToString(b)}`);
-    filtered.forEach(([elem, pt]) => {
-      const str = "(" + elem.toString() + ", " + v2ToString(pt) + ")";
-      console.log(str + ",\n");});
-
-    if(filtered.length != 2) { throw Error(" should only ever have 2 intersections");}
-    return filtered;
-
-  }
 
   static linkEdges(e1:HalfEdge, e2: HalfEdge) {
     //connects next and prev pointers for e1->e2
@@ -959,6 +1022,7 @@ function test():void {
  *                   ROADMAP
  
  TODO: Handle multiple components, and holes
+TODO: Handle non-convex polygons: currently point in face breaks for non-convex
  TODO: isInf will be just outerComponent == null
        - We'll then need a pointer dcel.outsideFace, which we can update as needed
        - Will simplify things

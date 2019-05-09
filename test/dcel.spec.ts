@@ -5,7 +5,7 @@ import { assert } from "chai";
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "../src/util";
 //import { left, pseudoAngle, vecAngle, orientPseudoAngle, orientPseudoAngle_unrolled } from "../src/primitives";
-import { isInnerComponent, DCEL, HalfEdge, Vertex, Face } from "../src/dcel";
+import { isInnerComponent, IntersectType, edgeIntersectLineCombinatoric, DCEL, HalfEdge, Vertex, Face } from "../src/dcel";
 
 
 
@@ -26,6 +26,8 @@ function assertElemNotEqual(a: Elem, b: Elem, note="") {
   let str_b = b&&b.toString();
   assert.notEqual(str_a, str_b, note);
 }
+
+const VEC = vec2.fromValues;
 
 // =======================================================================
 //
@@ -262,7 +264,34 @@ describe("dcel with test graph", function() {
     });
   });
 
+  //TODO: put in tests for insert and delete using integrity tests
+  //Make sure to test face merging by deleting a face that merges, one that doesnt merge
+  //also do merges from either side to make sure symmetry is fine
 
+
+  describe("edgeIntersectLineCombinatoric", function () {
+    const EILC = edgeIntersectLineCombinatoric;
+
+    it("should work for edge-on collisions", function() {
+      assert.equal(EILC(e[2], VEC(-1,0), VEC(0,0)), IntersectType.EDGE);
+      assert.equal(EILC(e[3], VEC(-1,0), VEC(0,0)), IntersectType.EDGE);
+    });
+    it("should work for vertex-on collisions", function() {
+      assert.equal(EILC(e[2], VEC(-1,-1), VEC(0,0)), IntersectType.VERT, "e2 should have corner");
+      assert.equal(EILC(e[5], VEC(-1,-1), VEC(0,0)), IntersectType.VERT, "e5 should have corner");
+    });
+    it("should work for degenerate collisions", function() {
+      assert.equal(EILC(e[2], v[1].v, v[2].v), IntersectType.DEGENERATE);
+    });
+    it("shouldn't report nearby edges", function() {
+      assert.equal(EILC(e[3], VEC(-1,-1), VEC(0,0)), IntersectType.NONE, "e3 intersects at head, shouldn't count");
+      assert.equal(EILC(e[4], VEC(-1,-1), VEC(0,0)), IntersectType.NONE, "e4 intersects at head, shouldn't count");
+
+      //Degenerate collisions should only count for the appropriate edge
+      assert.equal(EILC(e[0], v[1].v, v[2].v), IntersectType.NONE);
+      assert.equal(EILC(e[4], v[1].v, v[2].v), IntersectType.NONE);
+    });
+  });
 
 
   describe("face methods", function() {
