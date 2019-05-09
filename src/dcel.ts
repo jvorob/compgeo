@@ -246,7 +246,7 @@ function splitFaceAt(edge: HalfEdge) {
   //  Valid DCEL
 
 
-  console.log("Splitting face " + edge.face + " at edge " + edge);
+  //console.log("Splitting face " + edge.face + " at edge " + edge);
 
   let curr_face = edge.face;
   let new_face = new Face(edge.dcel);
@@ -288,7 +288,7 @@ function splitFaceAt(edge: HalfEdge) {
   // ====== Insert into list (if a face is inf it will be curr_Face)
   edge.dcel.faces.push(new_face)
 
-  console.log("Just split face at " + edge.toString());
+  //console.log("Just split face at " + edge.toString());
 }
 
 function mergeFacesAt(edge:HalfEdge) {
@@ -592,7 +592,7 @@ export class DCEL {
     // ====== Insert into arrays
     this.edges.push(E_ab);
     this.edges.push(E_ba);
-    console.log(`Inserted edge ${E_ab.toString()} Doing verify:`);
+    //console.log(`Inserted edge ${E_ab.toString()} Doing verify:`);
     Integrity.verifyAll(this);
     return E_ab;
   }
@@ -754,7 +754,7 @@ export class HalfEdge {
     this.dcel.verts.push(mid);
     //a, b, e1, et1 are not new
 
-    console.log("Doing verify in edge.split:");
+    //console.log("Doing verify in edge.split:");
     Integrity.verifyAll(this.dcel);
     return e_1;
   }
@@ -863,20 +863,20 @@ export class Face {
     
     if(!this.someEdge) { console.error("Trying to split empty face"); return null; }
     console.log("Doing splitWithLine: " + this + " pts: " + v2ToString(p1) + v2ToString(p2));
-    console.log("First edge: " + this.someEdge);
+    //console.log("First edge: " + this.someEdge);
 
     //Try to get two intersection points
     const [intx_type_1, edge_1 ] = lineIntersectWalk(this.someEdge, p1,p2);
     if(intx_type_1 == IntersectType.NONE) { throw Error("No intersections found"); }
     if(intx_type_1 == IntersectType.DEGENERATE) { throw Error("Degenerate intersection found"); }
 
-    console.log("First intesection: " + edge_1);
+    //console.log("First intesection: " + edge_1);
 
     const [intx_type_2, edge_2 ] = lineIntersectWalk(edge_1.next, p1,p2, edge_1); //stop before edge_1
     if(intx_type_2 == IntersectType.NONE) { throw Error("Only one intersection found"); }
     if(intx_type_2 == IntersectType.DEGENERATE) { throw Error("Degenerate intersection found"); }
 
-    console.log("2nd intesection: " + edge_2);
+    //console.log("2nd intesection: " + edge_2);
 
     const splitEdgeWithLine = (edge: HalfEdge, a: vec2, b: vec2) =>  {
       //returns null if failed
