@@ -232,69 +232,79 @@ class VoronoiTester {
 
     // We have one face, fix it up
     //new edge faces new site
-    //this.doFixupEdges(new_face, new_edge);
+    this.doFixupEdges(new_face, new_edge);
     
   }
 
 
 
-  doFixupEdges(targetFace: Face, curr_e:HalfEdge){
+  doFixupEdges(targetFace: Face, curr_edge:HalfEdge){
     //For the newly inserted face target
     //With the newly-inserted bisector e
     //Want to propagate bisector to next face
     //If hit at edge, 
-    //const next_left  = curr_e.next.twin
-    //const next_right = curr_e.twin.prev.twin
+    
+    const next_left  = curr_edge.next.twin
+    const next_right = curr_edge.twin.prev.twin
 
-    //console.log("Fixing up at " + curr_e.toString());
+    console.log("Fixing up at " + curr_edge.toString());
 
-    //if(next_left.face.isInf || next_right.face.isInf) {
-    //  console.log("next is inf, done");
-    //  return;
-    //}
+    // == Check termination
+    if(next_left.face.isInf || next_right.face.isInf) {
+      console.log("next is inf, done");
+      return;
+    }
 
-    ////if hit at vertex, go left
-    ////if hit at edge, doesn't matter
-    //const next_face = next_left.face;
-    //const next_site = next_face.site
-    //if(next_site == null) { console.log("null site"); return;}
+    //if hit at vertex, go left
+    //if hit at edge, doesn't matter
+    const next_face = next_left.face;
+    const next_site = next_face.site
+    if(next_site == null) { console.error("null site"); return;}
 
-    ////make perpendicular bisector
-    //let v1 = pointRelToVector(targetFace.site, next_site, 0.5, 1);
-    //let v2 = pointRelToVector(targetFace.site, next_site, 0.5, -1);
+    //make perpendicular bisector
+    if(targetFace.site == null) { throw Error("TargetFace shouldn't have null site: " + targetFace); }
+    let p1 = curr_edge.next.origin.v; //use the intersection point, since it's guaranteed to be on the bisector
+    let p2 = pointRelToVector(targetFace.site, next_site, 0.5, 1); // go clockwise
 
-    //const intersections = lineIntersectWalk(next_face.someEdge, v1,v2);
-    //const [e1, p1] = intersections[0];
-    //const [e2, p2] = intersections[1];
+    const new_edge = next_face.splitWithLine(p1,p2);
+    if(new_edge == null) { throw Error("Failed to split with line");}
 
-    //let next_el, next_pt;
-    //function check(elem: HalfEdge|Vertex, pt: vec2) {
-    //  if(elem instanceof Vertex) { return false; }
-    //  else {next_el = elem; next_pt = pt; return true;}
-    //}
+    //split returns edge pointing at midp
+    if(new_edge.face.site != null) { throw Error("New face should have null site"); }
 
-    //let count = 0;
-    //if(check(e1,p1))  { count++;}
-    //if(check(e2,p2))  { count++;}
+    const new_face = new_edge.face;
 
-    //try {
-    //if(count == 0) {throw Error("no edges intersecting"); }
-    //if(count == 2) {throw Error("two edges intersecting"); } // shuldn't happen, one is a vertex
-    //} catch (e) { console.error(e); }
+    //We've split off new_face
+    //we want to delete all edges between us and new_face
+    //           \    next_site              |
+    //             \ ------------            |
+    //    .         x         ^/             |
+    //    targ      x        w/              |
+    //              x       e/               |
+    //              x      n/                |
+    //              +      /                 |
+    //              x     /        last      |
+    //     curr>      x  /        site.      |
+    //   ---------------x                    |
+    //                    \                  |
+    //                                
+    //curr_edge.next.twin.face should be new_face
+    let next_del_edge = curr_edge.next;
+    let curr_del_edge: HalfEdge;
+    while(true) {
+      curr_del_edge = next_del_edge;
 
-    ////split edge
-    //const edge_to_split = next_el;
-    //const e_new = (edge_to_split as HalfEdge).split(next_pt);
-    //const new_vert = e_new.next.origin;
-    ////split returns edge pointing at midp
-    //
-    //// insert edge
-    //const last_vert = curr_e.next.origin;
-    //let new_edge = this.dcel.insertEdge(last_vert, new_vert);
+      if(curr_del_edge.twin.face == new_face // if it's an edge to the newly created face
+      || curr_del_edge.twin.face == targetFace) {  //or it's a vestigial edge connecting us to ourselves
 
-    ////That's the one we just hopped
-    //curr_e.next.deleteEdge();
+        next_del_edge = curr_del_edge.next;
+        curr_del_edge.deleteEdge();
+
+      } else { break;} //We hit the first edge we want to keep 
+    }
   
+    this.draw();
+    window.setTimeout(() => this.doFixupEdges(targetFace, new_edge), 1000);
   }
 }
 

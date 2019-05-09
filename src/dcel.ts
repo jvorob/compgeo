@@ -670,6 +670,14 @@ export class Vertex {
   }
 
   toString():string { return this.dcel.toStringElem(this); }
+  
+  delete() {
+    //deletes self
+    this.someEdgeAway = null;
+    const i = this.dcel.verts.indexOf(this);
+    if(i < 0) {throw Error("vertex not in own dcel list"); }
+    this.dcel.verts.splice(i,1);
+  }
 }
 
 export class HalfEdge {
@@ -791,11 +799,11 @@ export class HalfEdge {
 
 
     //If we're the only edge at a, origin now has no edges
-    if(E_ba.next == E_ab) { a.someEdgeAway = null; }
+    if(E_ba.next == E_ab) { a.delete(); }// a.someEdgeAway = null; }
     else if(a.someEdgeAway = E_ab){ a.someEdgeAway = E_ba.next } //otherwise find a replacement
 
     //If only edge at b, update
-    if(E_ab.next == E_ba) { b.someEdgeAway = null; }
+    if(E_ab.next == E_ba) { b.delete(); } //b.someEdgeAway = null; }
     else if(b.someEdgeAway = E_ba){ b.someEdgeAway = E_ab.next } //otherwise find a replacement
 
     //delete this and twin
