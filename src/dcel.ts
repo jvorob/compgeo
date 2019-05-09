@@ -4,6 +4,10 @@ import { pointsClose, segmentIntersectLine, distPointToLine,
 import { v2ToString, min, max, intStrZeroPad } from "./util";
 
 
+const DISABLE_INTEGRITY_CHECKS = true; //Integrity checks can be performed on the DCEL after most operations
+//They're like O(n^3) though
+
+
 // ==============================================================
 //                     TRAVERSAL QUERIES
 // ==============================================================
@@ -817,7 +821,7 @@ export class HalfEdge {
     E_ab.next = E_ab.prev = E_ab.twin = E_ab.origin = E_ab.face = (null as any);
     E_ba.next = E_ba.prev = E_ba.twin = E_ba.origin = E_ba.face = (null as any);
 
-    console.log("Doing verify in edge.delete:");
+    //console.log("Doing verify in edge.delete:");
     Integrity.verifyAll(this.dcel);
     return new_face;
   }
@@ -1033,6 +1037,8 @@ export module Integrity {
   }
   
   export function verifyAll(dcel: DCEL){ 
+    if(DISABLE_INTEGRITY_CHECKS) { return; }
+
     // All element's DCEL entries should point back to the same dcel
     // Element itself should be in the DCEL
     // Vertex: someEdge should be null, or refer to an edge in the DCEL

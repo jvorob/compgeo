@@ -1,6 +1,6 @@
 import { WrappedCanvas } from "./lib";
 import { vec2 } from "gl-matrix";
-import { v2ToString } from "./util";
+import { v2ToString, genRandomPoint } from "./util";
 import { Integrity, edgeWalkForEach,  IntersectType, lineIntersectWalk, DCEL, Vertex, HalfEdge, Face } from "./dcel";
 import * as DCEL_module from "./dcel";
 import { left, pointRelToVector,orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
@@ -19,8 +19,11 @@ export function main (canvas: WrappedCanvas){
 
 
 class VoronoiTester {
-  private readonly VERT_RADIUS=5; //pixels
+  private readonly VERT_RADIUS=3; //pixels
+  private readonly SITE_RADIUS=5; //pixels
   private readonly MOUSE_RADIUS=0.05; //world
+
+  private readonly STEP_MODE="FAST"; //"FAST" or "SLOW"
 
   private textbox: HTMLElement;
   private lastMousePos: vec2 = vec2.create();;
@@ -46,6 +49,17 @@ class VoronoiTester {
     this.canvas.canvas.addEventListener("mousemove", e=>this.handleMouseMove(e));
     this.canvas.canvas.addEventListener("mousedown", e=>this.handleMouseClick(e));
 
+
+    
+    //for(let i = 0; i < 100; i++) {
+    //  let p = genRandomPoint();
+    //  const feat = this.dcel.getFeatureNearPoint(p, this.MOUSE_RADIUS/10000);
+    //  if(feat instanceof Face) {
+    //    try{
+    //    this.doAddSite(feat, p);
+    //    }catch(e){console.error(e);}
+    //  }
+    //}
   }
 
   drawVert(vert: Vertex, style="black")  //radius 5 pixels
@@ -61,7 +75,7 @@ class VoronoiTester {
       //halfedges go clockwise around an edge
       //therefore arrow is on the left side
 
-      const radius = 0.05 //half the length of the arrow
+      const radius = 0.1 //half the length of the arrow
       const barb_size = radius * 0.3 //how long the barb is along the arrow
       const offset = radius * 0.1 //how far the arrow is from the edge
       //                |rad |              |
@@ -85,7 +99,7 @@ class VoronoiTester {
     //edgeWalkForEach(face.someEdge, e=>e.next, e=> {
     //  this.canvas.putLine(e.origin.v,e.next.origin.v,style);
     //});
-    if(face.site != null) {this.canvas.putPoint(face.site,this.VERT_RADIUS, style);}
+    if(face.site != null) {this.canvas.putPoint(face.site,this.SITE_RADIUS, style);}
   }
 
   drawFeature(elem: Vertex|HalfEdge|Face|null, style="black") {
@@ -185,7 +199,7 @@ class VoronoiTester {
     const [s_x, s_y] = this.eventToCoords(e);
     const pt = this.canvas.screen2world(vec2.fromValues(s_x,s_y));
 
-    const feat = this.dcel.getFeatureNearPoint(pt, this.MOUSE_RADIUS);
+    const feat = this.dcel.getFeatureNearPoint(pt, this.MOUSE_RADIUS/ 10);
     console.log("Clicked! : " + (feat && feat.toString()));
 
     try {
@@ -193,7 +207,7 @@ class VoronoiTester {
         this.doAddSite(feat, pt);
       }
       else if(feat instanceof HalfEdge) {
-        this.doDeleteEdge(feat);
+        //this.doDeleteEdge(feat);
       }
     } catch (e) {console.error(e); }
 
@@ -205,6 +219,19 @@ class VoronoiTester {
   doDeleteEdge(edge: HalfEdge) {
     edge.deleteEdge(); //Deletes the edge from the side we clicked
     Integrity.verifyAll(this.dcel);
+  }
+
+  nextStep(f:Function) {
+    //For long running or interactive things, call nextStep with a continuation
+    //updates the screen
+    //calls f after some condition (time, click, something)
+    
+    if(this.STEP_MODE == "FAST") { f() }
+    else {
+      this.update();
+      this.draw();
+      setTimeout(f,0);
+    }
   }
 
   doAddSite(face: Face, pt: vec2) {
@@ -232,8 +259,7 @@ class VoronoiTester {
 
     // We have one face, fix it up
     //new edge faces new site
-    this.draw();
-    window.setTimeout(() => this.doFixupEdges(new_face, new_edge, new_edge), 1000);
+    this.nextStep(() => this.doFixupEdges(new_face, new_edge, new_edge));
     
   }
 
@@ -307,8 +333,7 @@ class VoronoiTester {
       } else { break;} //We hit the first edge we want to keep 
     }
   
-    this.draw();
-    window.setTimeout(() => this.doFixupEdges(targetFace, first_edge, new_edge), 1000);
+    this.nextStep(() => this.doFixupEdges(targetFace, first_edge, new_edge));
   }
 
   doFixupEdgesReverse(targetFace: Face, first_edge:HalfEdge, curr_edge:HalfEdge){
@@ -377,8 +402,7 @@ class VoronoiTester {
       } else { break;} //We hit the first edge we want to keep 
     }
   
-    this.draw();
-    window.setTimeout(() => this.doFixupEdgesReverse(targetFace, first_edge, new_edge), 1000);
+    this.nextStep(() => this.doFixupEdgesReverse(targetFace, first_edge, new_edge));
   }
 }
 
