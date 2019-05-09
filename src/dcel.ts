@@ -84,13 +84,34 @@ export function isInnerComponent(edge: HalfEdge): boolean {
     const v1 = e1.origin.v;
     const v2 = e2.origin.v;
 
-    if(v1[1] < v2[1] ||  // if v1 leftward of v2, return -1 (left is smaller)
-      (v1[1] == v2[1] && v1[0] <= v2[0])) //if x-cor tied, use ycor
-    {return -1}
-    else {return 1};
+    if(v1 != v2){ //If distinct vertices, sort by coordinates
+      if(v1[0] < v2[0]) { return -1; }      // if v1 leftward of v2, return -1 (left is smaller)
+      else if(v1[0] == v2[0] && v1[1] < v2[1]) { return -1; } // if x-cor tied, use ycor (down is smaller)
+      else { return 1; }
+
+    } else { //If same vertex, break ties by angle
+      //    ^ |             |
+      //    eA|   we want eA|
+      //      .             |
+      //       \            |
+      //        \eB         |
+      //         \v         |
+
+      //eA can't be left of vertical
+      //eB can't be vertical ever, 
+      //we want eA if eA_next_orig is left of eB
+
+      const e1_head = e1.next.origin.v;
+      const e2_head = e2.next.origin.v;
+      const mid = v1
+
+      if(left(mid, e2_head, e1_head) > 0) { return -1; } //if e1 left, then e1 is the one we ant
+      else { return 1; } //e1 is right, so e2 is the outside one
+    };
   }
 
   const leftmostVert_edgeAway = edgeWalkMin(edge, stepNext, compareMinLeftmost);
+  console.log("isInnerComponent, edge is " + leftmostVert_edgeAway);
 
   //a, b, c are prev, leftmost, next
   const lv = leftmostVert_edgeAway.origin;
