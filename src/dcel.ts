@@ -780,7 +780,7 @@ export class HalfEdge {
     //             Ea_next      Eb                       |
     //                                                   |
     
-    console.log("deleting edge at " + this.toString());
+    //console.log("deleting edge at " + this.toString());
 
     const E_ab = this;
     const E_ba = this.twin;
@@ -826,6 +826,62 @@ export class HalfEdge {
     return new_face;
   }
 
+  deleteEdgeString() {
+    // we say two linked halfEdges are simply connected,
+    // if their shared vertex has degree two
+    // i.e. e.next.twin.next == e
+    // an edgestring is a maximal set of simply connected edges
+    // deleting an edgestring should need to merge faces at most once
+    //
+    //---------------------------------------------------*
+    //              Ea                                           |
+    //        < \ \                                       /      |
+    //         \ \ >                                 >   /       |
+    //            \                            tail_back/        |
+    //            Va------------Vb x x x x x Vc-------Vd         |
+    //          > /   <tail_forw    <curr_edge          \        |
+    //         / / /                                     \       |
+    //          / <                                       \      |
+    //                                                           |
+    //                                                           |
+    
+    //console.log("deleting edge string at " + this);
+    //We'll delete curr_edge, leaving a strand on either end
+
+    const curr_edge = this;
+    const strand_forward  = curr_edge.next;
+    const strand_backward = curr_edge.twin.next;
+
+    function deleteStrand(strand_end: HalfEdge) {
+      //an edge is a strand if origin has degree 1 (i.e. e.prev = e.twin
+      //strands should also have e.face = twin.face
+      //walks along the strand deleting edges until we hit a non-strand edge
+      
+      if(strand_end.prev != strand_end.twin) { return;} //make sure it's a strand
+
+      if(strand_end.face != strand_end.twin.face) {  //if it's a strand, the face property should hold
+        throw Error(`Edge is strand, but has different faces: ${strand_end}, twin=${strand_end.twin}`); }
+
+      //delete edge, check next one
+      const next_edge = strand_end.next;
+      strand_end.deleteEdge();
+      deleteStrand(next_edge);
+    }
+
+    //first delete curredge, will do facemerges
+    curr_edge.deleteEdge();
+
+    //then walk along in both directions
+    deleteStrand(strand_forward);
+    deleteStrand(strand_backward);
+
+
+
+    //console.log("Doing verify in edge.delete:");
+    Integrity.verifyAll(this.dcel);
+    //return new_face;
+  }
+
 
 
   static linkEdges(e1:HalfEdge, e2: HalfEdge) {
@@ -866,7 +922,7 @@ export class Face {
     //Else return new halfEdge, oriented to match p1, p2
     
     if(!this.someEdge) { console.error("Trying to split empty face"); return null; }
-    console.log("Doing splitWithLine: " + this + " pts: " + v2ToString(p1) + v2ToString(p2));
+    //console.log("Doing splitWithLine: " + this + " pts: " + v2ToString(p1) + v2ToString(p2));
     //console.log("First edge: " + this.someEdge);
 
     //Try to get two intersection points

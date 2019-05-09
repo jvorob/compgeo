@@ -256,156 +256,93 @@ class VoronoiTester {
     const new_face = new_edge.face;
     new_face.site = pt;
 
-    console.log("new edge: " + new_edge.toString());
-    console.log("new face: " + new_face.toString());
+    //console.log("new edge: " + new_edge.toString());
+    //console.log("new face: " + new_face.toString());
 
     // We have one face, fix it up
     //new edge faces new site
-    this.nextStep(() => this.doFixupEdges(new_face, new_edge, new_edge));
+    this.nextStep(() => this.doFixupEdgesBidirectional(new_face, new_edge, new_edge, true));
     
   }
 
-
-
-  doFixupEdges(targetFace: Face, first_edge: HalfEdge, curr_edge:HalfEdge){
+  doFixupEdgesBidirectional(targetFace: Face, stop_edge: HalfEdge, curr_edge:HalfEdge, isCCW: boolean): void{
+    //Extends the perpendicular-bisector edges for newly-inserted targetFace
+    //goes CCW from curr_edge.
+    //If we loop around to stop_edge, we're done
+    //If we hit the face at infinity, go CW from stop_edge until the other inf
+    
     //For the newly inserted face target
     //With the newly-inserted bisector e
     //Want to propagate bisector to next face
     //If hit at edge, 
     
-    if(curr_edge.next == first_edge) { console.log("Finished a full loop, done"); return; }
+    console.log(`Fixing up ${isCCW?"CCW":"CW"} at ` + curr_edge.toString());
 
-    const next_left  = curr_edge.next.twin
-    const next_right = curr_edge.twin.prev.twin
+    //next_left will actually be prev_right if CW, but whatever
+    const next_left  = isCCW? curr_edge.next.twin       :  curr_edge.prev.twin;
+    const next_right = isCCW? curr_edge.twin.prev.twin  :  curr_edge.twin.next.twin;
 
-    console.log("Fixing up at " + curr_edge.toString());
+    const next_edge_to_check = isCCW? curr_edge.next : curr_edge.prev;
+    const next_vert = isCCW? curr_edge.next.origin   : curr_edge.origin;
 
-    // == Check termination
-    if(next_left.face.isInf || next_right.face.isInf) {
+    //we want to delete all edges between us and new_face
+    //           \    next_site              |
+    //             \ ------------            |
+    //    .         |          /             |
+    //    targ      | new_face               |
+    //              |        /               |
+    //              .         <insert bisec  |
+    //              \n_left/                 |
+    //         n_edge\             last      |
+    //     curr>      \  /        site.      |
+    //   ---------------x n_vert             |
+    //                    \ n_right          |
+    
+
+    // ==== Check loop termination
+    if(next_edge_to_check == stop_edge) { console.log("Finished a full loop, done"); return; }
+
+    // ==== Check inf termination
+    if((next_left.face.isInf || next_right.face.isInf) && isCCW) { // first time, switch to CW
       console.log("next is inf, reversing");
-      this.doFixupEdgesReverse(targetFace, curr_edge, first_edge); //start from initial edge, run until where we get to so far
-      return;
+      return this.doFixupEdgesBidirectional(targetFace, curr_edge, stop_edge, false); 
+      //stop if we come around to curr_edge, start_fixing in the other direction from our initial stop_edge
+      
+    } else if((next_left.face.isInf || next_right.face.isInf) && !isCCW) { // if CW, done
+      console.log("hit inf, twice, done"); return;
     }
 
-    //if hit at vertex, go left
-    //if hit at edge, doesn't matter
+    // ============== Now: create next bisector edge
+    // we want to take next_left.face, and split it with a perp bisector w/r to site
     const next_face = next_left.face;
     const next_site = next_face.site
-    if(next_site == null) { console.error("null site"); return;}
+    if(next_site == null) { console.error("hit null site"); return;}
+    if(targetFace.site == null) { throw Error("TargetFace shouldn't have null site: " + targetFace); }
 
     //make perpendicular bisector
-    if(targetFace.site == null) { throw Error("TargetFace shouldn't have null site: " + targetFace); }
-    let p1 = curr_edge.next.origin.v; //use the intersection point, since it's guaranteed to be on the bisector
-    let p2 = pointRelToVector(targetFace.site, next_site, 0.5, 1); // go CCW
+    let p1 = next_vert.v; //use the intersection point, since it's guaranteed to be on the bisector
+    let p2 = pointRelToVector(targetFace.site, next_site, 0.5, isCCW ? 1: -1); // positive is left, ccw
 
-    const new_edge = next_face.splitWithLine(p1,p2);
+    let new_edge = next_face.splitWithLine(p1,p2);
     if(new_edge == null) { throw Error("Failed to split with line");}
 
+    // ========= Split off new face, find which half-edge is on the new face
     //split returns edge pointing at midp
-    if(new_edge.face.site != null) { throw Error("New face should have null site: new face:" +new_edge.face); }
+    if(new_edge.face.site != null) { new_edge = new_edge.twin; console.log("Site on wrong side, flipping : " + new_edge);}
+    if(new_edge.face.site != null) { throw Error("Neither face on new_edge has null site. new face:" +new_edge.face); }
+    
+    // ========= delete the string of edges between us and new face
+    const del_edge = next_left;
+    del_edge.deleteEdgeString()
 
-    const new_face = new_edge.face;
 
-    //We've split off new_face
-    //we want to delete all edges between us and new_face
-    //           \    next_site              |
-    //             \ ------------            |
-    //    .         x         ^/             |
-    //    targ      x        w/              |
-    //              x       e/               |
-    //              x      n/                |
-    //              +      /                 |
-    //              x     /        last      |
-    //     curr>      x  /        site.      |
-    //   ---------------x                    |
-    //                    \                  |
-    //                                
-    //curr_edge.next.twin.face should be new_face
-    let next_del_edge = curr_edge.next;
-    let curr_del_edge: HalfEdge;
-    while(true) {
-      curr_del_edge = next_del_edge;
+    //new_edge should now be facing new_face
 
-      if(curr_del_edge.twin.face == new_face // if it's an edge to the newly created face
-      || curr_del_edge.twin.face == targetFace) {  //or it's a vestigial edge connecting us to ourselves
-
-        next_del_edge = curr_del_edge.next;
-        curr_del_edge.deleteEdge();
-
-      } else { break;} //We hit the first edge we want to keep 
-    }
-  
-    this.nextStep(() => this.doFixupEdges(targetFace, first_edge, new_edge));
+    //const new_face = new_edge.face;
+    this.nextStep(() => this.doFixupEdgesBidirectional(targetFace, stop_edge, new_edge!, isCCW));
   }
 
-  doFixupEdgesReverse(targetFace: Face, first_edge:HalfEdge, curr_edge:HalfEdge){
-    //Same as fixupedges, but runs in reverse 
-    //should go CW around site, runs prev-wards along edges
-    
-    
-    const next_right  = curr_edge.prev.twin
-    const next_left = curr_edge.twin.next.twin
 
-    if(curr_edge.prev == first_edge) { console.log("Finished a full loop, done"); return; }
-
-    console.log("Fixing up at " + curr_edge.toString());
-
-    // == Check termination
-    if(next_left.face.isInf || next_right.face.isInf) {
-      console.log("next is inf, done");
-      return;
-    }
-
-    //if hit at vertex, go left
-    //if hit at edge, doesn't matter
-    const next_face = next_right.face;
-    const next_site = next_face.site
-    if(next_site == null) { console.error("null site"); return;}
-
-    //make perpendicular bisector
-    if(targetFace.site == null) { throw Error("TargetFace shouldn't have null site: " + targetFace); }
-    let p1 = next_right.origin.v; //use the intersection point, since it's guaranteed to be on the bisector
-    let p2 = pointRelToVector(targetFace.site, next_site, 0.5, -1); // go clockwise
-
-    const new_edge = next_face.splitWithLine(p2,p1); // we want edge oriented p2 p1, backwards
-    if(new_edge == null) { throw Error("Failed to split with line");}
-
-    //split returns edge pointing at midp
-    if(new_edge.face.site != null) { throw Error("New face should have null site: new face:" +new_edge.face); }
-
-    const new_face = new_edge.face;
-
-    //We've split off new_face
-    //we want to delete all edges between us and new_face
-    //           \    next_site              |
-    //             \ ------------            |
-    //    .         x          /             | (but like imagine this picture mirrored)
-    //    targ      x        w/              |
-    //              x       e/               |
-    //              x      n/                |
-    //              +     v/                 |
-    //              x     /        last      |
-    //     <curr      x  /        site.      |
-    //   ---------------x                    |
-    //                    \                  |
-    //                                
-    //curr_edge.prev.twin.face should be new_face
-    let next_del_edge = curr_edge.prev;
-    let curr_del_edge: HalfEdge;
-    while(true) {
-      curr_del_edge = next_del_edge;
-
-      if(curr_del_edge.twin.face == new_face // if it's an edge to the newly created face
-      || curr_del_edge.twin.face == targetFace) {  //or it's a vestigial edge connecting us to ourselves
-
-        next_del_edge = curr_del_edge.prev;
-        curr_del_edge.deleteEdge();
-
-      } else { break;} //We hit the first edge we want to keep 
-    }
-  
-    this.nextStep(() => this.doFixupEdgesReverse(targetFace, first_edge, new_edge));
-  }
 }
 
 
