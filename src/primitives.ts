@@ -3,8 +3,8 @@ import {v2ToString } from "./util";
 
 
 //might want these different sometime?
-export const DIST_EPSILON = 0.000001; //32-bit floats have ~6 decimal digits of precision
-export const CALC_EPSILON = 0.000001; //This might be ok as long as we're near the unit square
+export const DIST_EPSILON = 0.00001; //32-bit floats have ~6 decimal digits of precision
+export const CALC_EPSILON = 0.00001; //This might be ok as long as we're near the unit square
 
 
 //given 3 points ABC

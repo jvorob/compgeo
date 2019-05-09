@@ -3,7 +3,7 @@ import { vec2 } from "gl-matrix";
 import { v2ToString, genRandomPoint } from "./util";
 import { Integrity, edgeWalkForEach,  IntersectType, lineIntersectWalk, DCEL, Vertex, HalfEdge, Face } from "./dcel";
 import * as DCEL_module from "./dcel";
-import { left, pointRelToVector,orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
+import { left, pointsClose, pointRelToVector,orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
 
 
 let globalCanvas: WrappedCanvas;
@@ -23,7 +23,8 @@ class VoronoiTester {
   private readonly SITE_RADIUS=5; //pixels
   private readonly MOUSE_RADIUS=0.05; //world
 
-  private readonly STEP_MODE="FAST"; //"FAST" or "SLOW"
+  private readonly STEP_MODE:any="SLOW"; //"FAST" or "SLOW"
+  private readonly STEP_DELAY = 500;
 
   private textbox: HTMLElement;
   private lastMousePos: vec2 = vec2.create();;
@@ -230,12 +231,13 @@ class VoronoiTester {
     else {
       this.update();
       this.draw();
-      setTimeout(f,0);
+      setTimeout(f,this.STEP_DELAY);
     }
   }
 
   doAddSite(face: Face, pt: vec2) {
     if(face.site == null) { face.site = pt; return}
+    if(pointsClose(face.site, pt) ) { console.error("duplicate site, ignoring"); return;}
 
     console.log("Doing doAddSite");
     //make perpendicular bisector
@@ -369,7 +371,7 @@ class VoronoiTester {
     if(new_edge == null) { throw Error("Failed to split with line");}
 
     //split returns edge pointing at midp
-    if(new_edge.face.site != null) { throw Error("New face should have null site"); }
+    if(new_edge.face.site != null) { throw Error("New face should have null site: new face:" +new_edge.face); }
 
     const new_face = new_edge.face;
 

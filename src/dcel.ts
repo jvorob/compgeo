@@ -1037,18 +1037,16 @@ export module Integrity {
   }
   
   export function verifyAll(dcel: DCEL){ 
+    //This one is scattered througout code, can be turned on and off
     if(DISABLE_INTEGRITY_CHECKS) { return; }
+    verifyExplicit(dcel);
 
-    // All element's DCEL entries should point back to the same dcel
-    // Element itself should be in the DCEL
-    // Vertex: someEdge should be null, or refer to an edge in the DCEL
-    // Edge: next,prev,twin, origin, face, should all be in the DCEL
-    // Face: someEdge should be in the DCEL
-    
+  }
+  export function verifyExplicit(dcel: DCEL) {
+    //This one just odes the thing
     dcel.edges.forEach( e => { verifyEdgeDefined(dcel, e); });
     dcel.verts.forEach( v => { verifyVertexDefined(dcel, v); });
     dcel.faces.forEach( f => { verifyFaceDefined(dcel, f); });
-
   }
 
 }
