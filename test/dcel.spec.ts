@@ -275,6 +275,11 @@ describe("dcel with test graph", function() {
         assert.isFalse(isInnerComponent(e[1]), "closed test graph has outercomp");
         assert.isTrue(isInnerComponent(e[0]), "closed test graph has innercomp");
       });
+      it("should work if there's multiple edges away from the same vert", function(){
+        for(let i = 0; i < e.length; i++) {
+          assert.isTrue(isInnerComponent(e[i]), "should be innercomp if we start from e" + i);
+        }
+      });
     });
   });
 });

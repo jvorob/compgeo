@@ -358,8 +358,11 @@ export class DCEL {
     this.edges.push(E_ab);
     this.edges.push(E_ba);
 
-    return E_ab;
 
+    console.log(`Inserted edge ${E_ab.toString()} Doing verify:`);
+    try {Integrity.verifyAll(this); } catch (e) { console.error(e); }
+
+    return E_ab;
   }
 
 
@@ -514,7 +517,9 @@ export class HalfEdge {
     this.dcel.edges.push(et_2);
     this.dcel.verts.push(mid);
 
+    console.log("Doing verify in edge.split:");
     Integrity.verifyAll(this.dcel);
+    return e_1;
   }
 
   static linkEdges(e1:HalfEdge, e2: HalfEdge) {
@@ -592,7 +597,7 @@ export class Face {
 //               INTEGRITY TESTS
 // ==========================================================
 
-module Integrity {
+export module Integrity {
   // Contains integrity tests, which are functions that can be called on a DCEL
   // Check various invariants
   // If they fail, will throw and output appropriate logging
@@ -604,7 +609,8 @@ module Integrity {
   class AssertionError extends Error {
   }
 
-  function assert(b:boolean, msg="") {
+  function assert(b:boolean, msg="", e?: Element) {
+    if(e != undefined) { msg += ": " + e.toString(); }
     if(!b) { throw new AssertionError(msg); }
   }
 
@@ -618,8 +624,8 @@ module Integrity {
   //} else { throw Error("Unkown Type in verifyElemDefined: " + elem); }
 
   function isElemInDCEL(dcel: DCEL, elem: Element) {
-    assert(elem != null, "elem is null");
-    assert(elem.dcel == dcel, "dcel doesn't match elem.dcel");;
+    assert(elem != null, "elem is null", elem);
+    assert(elem.dcel == dcel, "dcel doesn't match elem.dcel", elem);;
 
     let arr: Element[];
          if(elem instanceof HalfEdge) { arr = dcel.edges; }
@@ -644,51 +650,52 @@ module Integrity {
     assert(e.dcel == dcel, "dcel doesn't match e.dcel");;
     //check   prev, next, twin, origin, face
     
-    assert(isElemInDCEL(dcel, e.prev),   "prev not in dcel");
-    assert(isElemInDCEL(dcel, e.next),   "next not in dcel");
-    assert(isElemInDCEL(dcel, e.twin),   "twin not in dcel");
-    assert(isElemInDCEL(dcel, e.face),   "face not in dcel");
-    assert(isElemInDCEL(dcel, e.origin), "origin not in dcel");
+    assert(isElemInDCEL(dcel, e.prev)  ,   "prev not in dcel", e);
+    assert(isElemInDCEL(dcel, e.next)  ,   "next not in dcel", e);
+    assert(isElemInDCEL(dcel, e.twin)  ,   "twin not in dcel", e);
+    assert(isElemInDCEL(dcel, e.face)  ,   "face not in dcel", e);
+    assert(isElemInDCEL(dcel, e.origin), "origin not in dcel", e);
 
-    assert(e.next.prev == e, "next doesn't link back");
-    assert(e.prev.next == e, "prev doesn't link back");
-    assert(e.twin.twin == e, "twin doesn't link back");
+    assert(e.next.prev == e, "next doesn't link back", e);
+    assert(e.prev.next == e, "prev doesn't link back", e);
+    assert(e.twin.twin == e, "twin doesn't link back", e);
 
-    assert(e.next.origin == e.twin.origin, "next and twin should have same origin");
+    assert(e.next.origin == e.twin.origin, "next and twin should have same origin", e);
 
-    assert(e.face == e.next.face, "next doesn't share a face with me");
+    assert(e.face == e.next.face, "next doesn't share a face with me", e);
 
     //check that im connected to origin properly. 
     const target_edge = e.origin.someEdgeAway;
-    assert(canReach(e, e=>e.twin.next, target_edge), "should be able reach all edges around origin)");
+    assert(canReach(e, edge=>edge.twin.next, target_edge), 
+        `should be able reach all edges around origin, can't reach ${target_edge.toString()}`, e);
 
   }
 
   function verifyVertexDefined(dcel: DCEL, v: Vertex) {
     assert(v.dcel == dcel, "dcel doesn't match v.dcel");;
     if(v.someEdgeAway != null) {
-      assert(isElemInDCEL(dcel, v.someEdgeAway),  "someEdgeAway not in dcel");
-      assert(v.someEdgeAway.origin == v,          "someEdgeAway doesn't have me as origin");
+      assert(isElemInDCEL(dcel, v.someEdgeAway),  "someEdgeAway not in dcel", v);
+      assert(v.someEdgeAway.origin == v,          "someEdgeAway doesn't have me as origin", v);
     }
     
     //TODO: edge connectedness properties?
   }
   function verifyFaceDefined(dcel: DCEL, f: Face) {
-    assert(f.dcel == dcel, "dcel doesn't match f.dcel");;
+    assert(f.dcel == dcel, "dcel doesn't match f.dcel", f);;
 
     if(f.someEdge != null) {
-      assert(isElemInDCEL(dcel, f.someEdge),  "someEdge not in dcel");
-      assert(f.someEdge.face == f, "someEdge doesn't have me as face");
+      assert(isElemInDCEL(dcel, f.someEdge),  "someEdge not in dcel", f);
+      assert(f.someEdge.face == f, "someEdge doesn't have me as face", f);
 
       edgeWalkForEach(f.someEdge, e => e.next, e=> {
-        assert(f.someEdge.face == f, `edge ${e.toString()} in my component doesn't have me as face`);
+        assert(f.someEdge.face == f, `edge ${e.toString()} in my component doesn't have me as face`, f);
       });
 
       const am_first = dcel.faces.indexOf(f) == 0;
-      assert(am_first == f.isInf, "only first face should be isInf");
+      assert(am_first == f.isInf, "only first face should be isInf", f);
       
       const am_clockwise = isInnerComponent(f.someEdge);
-      assert(am_clockwise == f.isInf, "only inf face should have an inner component");
+      assert(am_clockwise == f.isInf, "only inf face should have an inner component", f);
     }
 
   }
@@ -700,9 +707,9 @@ module Integrity {
     // Edge: next,prev,twin, origin, face, should all be in the DCEL
     // Face: someEdge should be in the DCEL
     
-    dcel.faces.forEach( f => { verifyFaceDefined(dcel, f); });
     dcel.edges.forEach( e => { verifyEdgeDefined(dcel, e); });
     dcel.verts.forEach( v => { verifyVertexDefined(dcel, v); });
+    dcel.faces.forEach( f => { verifyFaceDefined(dcel, f); });
 
   }
 
