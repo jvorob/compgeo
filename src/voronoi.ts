@@ -1,7 +1,7 @@
 import { WrappedCanvas } from "./lib";
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "./util";
-import { Integrity, edgeWalkForEach,  lineIntersectWalk, DCEL, Vertex, HalfEdge, Face } from "./dcel";
+import { Integrity, edgeWalkForEach,  IntersectType, lineIntersectWalk, DCEL, Vertex, HalfEdge, Face } from "./dcel";
 import * as DCEL_module from "./dcel";
 import { left, pointRelToVector,orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
 
@@ -28,7 +28,7 @@ class VoronoiTester {
 
   private dcel: DCEL;
   constructor(private canvas: WrappedCanvas) {
-    this.textbox = document.getElementById("textbox");
+    this.textbox = (document.getElementById("textbox") as any);
 
 
     this.dcel = new DCEL();
@@ -88,7 +88,7 @@ class VoronoiTester {
     if(face.site != null) {this.canvas.putPoint(face.site,this.VERT_RADIUS, style);}
   }
 
-  drawFeature(elem: Vertex|HalfEdge|Face, style="black") {
+  drawFeature(elem: Vertex|HalfEdge|Face|null, style="black") {
     //delegates to the appropriate method
     if(elem == null) 
     {return}
@@ -101,7 +101,7 @@ class VoronoiTester {
     else { throw Error("drawFeature not implemented for" + elem); }
   }
 
-  debugDrawFeature(elem: Vertex|HalfEdge|Face, style="black") {
+  debugDrawFeature(elem: Vertex|HalfEdge|Face|null, style="black") {
     //delegates to the appropriate method
     if(elem == null) 
     {return}
@@ -131,9 +131,11 @@ class VoronoiTester {
   }
 
   debugDrawFace(face: Face) {
-    edgeWalkForEach(face.someEdge, e=> e.next, e=> this.drawHalfEdge(e, "green"));
+    if(face.someEdge != null) { 
+      edgeWalkForEach(face.someEdge, e=> e.next, e=> this.drawHalfEdge(e, "green"));
+      this.drawHalfEdge(face.someEdge, "red");
+    }
     if(face.site != null) { this.canvas.putPoint(face.site, this.VERT_RADIUS, "red"); }
-    this.drawHalfEdge(face.someEdge, "red");
 
   }
 
@@ -208,66 +210,60 @@ class VoronoiTester {
   doAddSite(face: Face, pt: vec2) {
     if(face.site == null) { face.site = pt; return}
 
-    console.log("splitting face for site");
+    console.log("Doing doAddSite");
     //make perpendicular bisector
 
-    //should get perp bisector
-    let v1 = pointRelToVector(pt, face.site, 0.5, 1);
-    let v2 = pointRelToVector(pt, face.site, 0.5, -1);
+    //should get perp bisector facing CCW around new site
+    let p1 = pointRelToVector(pt, face.site, 0.5, -1); //right of center
+    let p2 = pointRelToVector(pt, face.site, 0.5, 1); // left of center
+    //p1 to p2 is CCW
 
-    const intersection_1 = lineIntersectWalk(face.someEdge, v1,v2);
-    if(intersection_1 == null) { throw Error("No intersections found"); }
-    //const [isVertex, elem1, p1] = int_result;
+    const new_edge = face.splitWithLine(p1,p2);
+    if(new_edge == null) { throw Error("Failed to split with line");}
 
-    //if(!isVertex) { //need to split edge
-    //}
+    //split returns edge pointing at midp
+    if(new_edge.face.site != null) { throw Error("New face should have null site"); }
 
+    const new_face = new_edge.face;
+    new_face.site = pt;
 
-    //const e1_new = (e1 as HalfEdge).split(p1);
-    //const e2_new = (e2 as HalfEdge).split(p2);
+    console.log("new edge: " + new_edge.toString());
+    console.log("new face: " + new_face.toString());
 
-    ////split returns edge pointing at midp
-    //let new_edge = this.dcel.insertEdge(e1_new.next.origin, e2_new.next.origin);
-    //if(new_edge.face.site != null) { new_edge = new_edge.twin };
-
-    //const new_face = new_edge.face;
-    //new_face.site = pt;
-
-    //console.log("new edge: " + new_edge.toString());
-    //console.log("new face: " + new_face.toString());
-
-    //// We have one face, fix it up
-    ////new edge faces new site
+    // We have one face, fix it up
+    //new edge faces new site
     //this.doFixupEdges(new_face, new_edge);
     
   }
+
+
 
   doFixupEdges(targetFace: Face, curr_e:HalfEdge){
     //For the newly inserted face target
     //With the newly-inserted bisector e
     //Want to propagate bisector to next face
     //If hit at edge, 
-    const next_left  = curr_e.next.twin
-    const next_right = curr_e.twin.prev.twin
+    //const next_left  = curr_e.next.twin
+    //const next_right = curr_e.twin.prev.twin
 
-    console.log("Fixing up at " + curr_e.toString());
+    //console.log("Fixing up at " + curr_e.toString());
 
-    if(next_left.face.isInf || next_right.face.isInf) {
-      console.log("next is inf, done");
-      return;
-    }
+    //if(next_left.face.isInf || next_right.face.isInf) {
+    //  console.log("next is inf, done");
+    //  return;
+    //}
 
-    //if hit at vertex, go left
-    //if hit at edge, doesn't matter
-    const next_face = next_left.face;
-    const next_site = next_face.site
-    if(next_site == null) { console.log("null site"); return;}
+    ////if hit at vertex, go left
+    ////if hit at edge, doesn't matter
+    //const next_face = next_left.face;
+    //const next_site = next_face.site
+    //if(next_site == null) { console.log("null site"); return;}
 
-    //make perpendicular bisector
-    let v1 = pointRelToVector(targetFace.site, next_site, 0.5, 1);
-    let v2 = pointRelToVector(targetFace.site, next_site, 0.5, -1);
+    ////make perpendicular bisector
+    //let v1 = pointRelToVector(targetFace.site, next_site, 0.5, 1);
+    //let v2 = pointRelToVector(targetFace.site, next_site, 0.5, -1);
 
-    const intersections = lineIntersectWalk(next_face.someEdge, v1,v2);
+    //const intersections = lineIntersectWalk(next_face.someEdge, v1,v2);
     //const [e1, p1] = intersections[0];
     //const [e2, p2] = intersections[1];
 

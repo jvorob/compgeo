@@ -19,7 +19,7 @@ export class WrappedCanvas {
   public fieldSize: number = 1.1;
 
   constructor(public canvas: HTMLCanvasElement) {
-    this.ctx = canvas.getContext("2d");
+    this.ctx = canvas.getContext("2d")!;
 
   }
 

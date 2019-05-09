@@ -157,48 +157,23 @@ export function edgeIntersectLineCombinatoric(edge: HalfEdge, a: vec2, b:vec2): 
 }
 
 type IntersectResult = [IntersectType, HalfEdge]
-export function lineIntersectWalk(start_edge:HalfEdge, a: vec2, b: vec2): IntersectResult {
-  //walks the edges, returns the first intersection it encounters
-  //returns [elem, isDegenerate]
-  //Vertex
-  //Elem is vertex or edge if intersected
-  //Elem is null if no intersections
-  //isDgenerate is true if the edge goes along line ab
-  //
-  //
-  //starts immediately after this.origin
-  //returns a vertex if it finds ony
-  //only returns edge if strict interior intersection
-  //only returns this.origin if that is exactly the only intersection
-  //
-  //returns [isVertex, HalfEdge, intersPoint ]
-  //if isVertex is true, then the intersection occurs at HalfEdge.origin
+export function lineIntersectWalk(start_edge:HalfEdge, a: vec2, b: vec2, 
+                                  stop_before?:HalfEdge): IntersectResult {
+  //walks the edges, returns the first edge that intersects the line
+  //according to edgeIntersectLineCombinatoric, so next.origin intersection wont be counted until we reach next
+  //returns [IntersectType, edge_where_it_happened]
+  //If stop_before is provided, it will stop before at that edge without checking it
 
-
-  const VertLeftOfLine = (v:Vertex) => { return left(a, b, v.v) > 0; }
-
-
-
-  let lastVertLeft = VertLeftOfLine(start_edge.origin);
-  let curr_e = start_edge;
+  if(stop_before == undefined) { stop_before = start_edge; }
+  let curr_edge = start_edge
   while(true) {
-    const nextVert = curr_e.next.origin;
+    //If we found anything of interest, return it
+    const intx_type = edgeIntersectLineCombinatoric(curr_edge, a, b)
+    if(intx_type != IntersectType.NONE) { return [ intx_type, curr_edge ] }
 
-
-    curr_e = curr_e.next;
-    if(curr_e == start_edge) { return null; } //Found no intersections
+    curr_edge = curr_edge.next;
+    if(curr_edge == stop_before) { return [IntersectType.NONE, start_edge]; } //Found no intersections
   }
-
-  // // FANCY LOGGING
-  // //console.log("ints");
-  // //intersections.forEach(([elem, pt]) => {
-  // //  const str = "(" + elem.toString() + ", " + v2ToString(pt) + ")";
-  // //  console.log(str + ",\n");});
-
-
-  // if(filtered.length != 2) { throw Error(" should only ever have 2 intersections");}
-  // return filtered;
-
 }
 
 
@@ -302,7 +277,7 @@ function splitFaceAt(edge: HalfEdge) {
   if(site != null){
     let side_with_site;
     const [v0, v1] = edge.getPoints();
-    if(left(v0, v1, edge.face.site) > 0)  //if site in edge.face then site left of edge
+    if(left(v0, v1, edge.face.site!) > 0)  //if site in edge.face then site left of edge
          { side_with_site = edge; }
     else { side_with_site = edge.twin; }
 
@@ -329,6 +304,8 @@ function mergeFacesAt(edge:HalfEdge) {
   // We'll delete the twin face
   const keep_face = edge.face
   const del_face = edge.twin.face
+  const del_index = edge.dcel.faces.indexOf(del_face);
+  if(del_index < 0){ throw Error("face not in dcel in mergeFaces");}
     
   //We never want to delete the face at infinity, so switch sides if that happens
   if(del_face.isInf) { 
@@ -336,11 +313,8 @@ function mergeFacesAt(edge:HalfEdge) {
     mergeFacesAt(edge.twin);
     return;
   }
+
   //Now, any inf will be on edge.face, so we can delete twin
-
-  //set twin component to keep_face
-  edgeWalkForEach(edge.twin, e=> e.next, e=>  e.face = keep_face );
-
 
   //Merge attributes (copy over site if needed)
   if(del_face.site != null) {
@@ -348,10 +322,13 @@ function mergeFacesAt(edge:HalfEdge) {
     else { throw Error("Can't merge two faces both with sites: " + keep_face + " " + del_face); }
   }
 
+  //set twin component to keep_face
+  edgeWalkForEach(edge.twin, e=> e.next, e=>  e.face = keep_face );
+
+
+
   // remove del_face
-  const index = edge.dcel.faces.indexOf(del_face);
-  if(index < 0){ throw Error("face not in dcel in mergeFaces");}
-  edge.dcel.faces.splice(index, 1); //delete it
+  edge.dcel.faces.splice(del_index, 1); //delete it
 }
 
 // ====================================================================================================
@@ -398,7 +375,7 @@ export class DCEL {
 
   }
 
-  toId(elem: Vertex | HalfEdge | Face): string {
+  toId(elem: Vertex | HalfEdge | Face | null): string {
     //returns a short string like  v12 or e01 or f01
     //number is index in this dcel
     //if element cant be found in dcel, return e???
@@ -553,7 +530,7 @@ export class DCEL {
       //connects next and prev pointers for e1->e2
       e1.next = e2; e2.prev = e1; }
 
-    function spliceEdgesAround(V: Vertex, incoming_edge: HalfEdge,
+    function spliceEdgesAround(V: Vertex, incoming_edge: HalfEdge | null,
       new_away: HalfEdge, new_towards: HalfEdge) {
       //          \ \ incoming_edge            |
       //         \ \ >                       |
@@ -579,6 +556,7 @@ export class DCEL {
     //console.log(`Inserting edge from ${Va.toString()} to ${Vb.toString()}`);
     let Ea = this.getHalfEdgeHittingRay(Va, Vb);
     let Eb = this.getHalfEdgeHittingRay(Vb, Va);
+    //if(Ea == null || Eb == null) { throw Error("No hitting ray in insertedge splice edges")}
     spliceEdgesAround(Va, Ea, E_ab, E_ba); //v, e, new_away, new_towards
     spliceEdgesAround(Vb, Eb, E_ba, E_ab);
 
@@ -674,6 +652,10 @@ export class DCEL {
 
     return null;
   }
+
+
+
+
 }
 
 
@@ -722,7 +704,7 @@ export class HalfEdge {
     //console.log("splitting edge" + this + "at pt" + v2ToString(pt));
 
     //======= Make sure we dont get a degenerate split
-    if(PointOnEdgeInterior(pt, this) == null) { return null; }
+    if(PointOnEdgeInterior(pt, this) == null) { console.error("split edge: point not on edge"); return null; }
 
     //console.log("checkspassed");
 
@@ -736,8 +718,8 @@ export class HalfEdge {
     let e_1 = this;
     let et_1 = this.twin;
 
-    console.log(e_1.toString());
-    console.log(et_1.toString());
+    //console.log(e_1.toString());
+    //console.log(et_1.toString());
 
     // Make new edges, set origins, twin, set faces
     e_2.origin  = mid; e_2.twin  = et_2; e_2.face  = this.face;
@@ -824,8 +806,8 @@ export class HalfEdge {
 
 
     //wipe them also just to be safe
-    E_ab.next = E_ab.prev = E_ab.twin = E_ab.origin = E_ab.face = null;
-    E_ba.next = E_ba.prev = E_ba.twin = E_ba.origin = E_ba.face = null;
+    E_ab.next = E_ab.prev = E_ab.twin = E_ab.origin = E_ab.face = (null as any);
+    E_ba.next = E_ba.prev = E_ba.twin = E_ba.origin = E_ba.face = (null as any);
 
     console.log("Doing verify in edge.delete:");
     Integrity.verifyAll(this.dcel);
@@ -856,6 +838,7 @@ export class Face {
 
   containsPoint(pt: vec2) {
     // If face left of all edges or on edges
+    if(!this.someEdge) {return false;}
     let allleft = true;
     edgeWalkForEach(this.someEdge, e=>e.next, e=> {
       const [v1, v2] = e.getPoints();
@@ -863,6 +846,71 @@ export class Face {
     });
 
     return allleft;
+  }
+
+  splitWithLine(p1: vec2, p2: vec2): HalfEdge|null {
+    //Tries to split this face across the line p1, p2
+    //If line doesn't intersect at two points, return null
+    //Else return new halfEdge, oriented to match p1, p2
+    
+    if(!this.someEdge) { console.error("Trying to split empty face"); return null; }
+    console.log("Doing splitWithLine: " + this + " pts: " + v2ToString(p1) + v2ToString(p2));
+    console.log("First edge: " + this.someEdge);
+
+    //Try to get two intersection points
+    const [intx_type_1, edge_1 ] = lineIntersectWalk(this.someEdge, p1,p2);
+    if(intx_type_1 == IntersectType.NONE) { throw Error("No intersections found"); }
+    if(intx_type_1 == IntersectType.DEGENERATE) { throw Error("Degenerate intersection found"); }
+
+    console.log("First intesection: " + edge_1);
+
+    const [intx_type_2, edge_2 ] = lineIntersectWalk(edge_1.next, p1,p2, edge_1); //stop before edge_1
+    if(intx_type_2 == IntersectType.NONE) { throw Error("Only one intersection found"); }
+    if(intx_type_2 == IntersectType.DEGENERATE) { throw Error("Degenerate intersection found"); }
+
+    console.log("2nd intesection: " + edge_2);
+
+    const splitEdgeWithLine = (edge: HalfEdge, a: vec2, b: vec2) =>  {
+      //returns null if failed
+      const [ e_p1, e_p2 ] = edge.getPoints();
+
+      const intx_pt = segmentIntersectLine(e_p1,e_p2, p1, p2);
+      if(intx_pt == null) { return null; }
+
+      const edge_to_mid = edge.split(intx_pt);
+      if(edge_to_mid == null) { return null; } //TODO: make method to split edge across line instead?
+
+      const v_mid = edge_to_mid.next.origin; //new vertex
+      return v_mid
+    }
+
+    // Convert them to vertices
+    let v1!: Vertex | null, v2! : Vertex | null;
+    if(     intx_type_1 == IntersectType.VERT) { v1 = edge_1.origin; }
+    else if(intx_type_1 == IntersectType.EDGE) { v1 = splitEdgeWithLine(edge_1, p1, p2); }
+
+    if(     intx_type_2 == IntersectType.VERT) { v2 = edge_2.origin; }
+    else if(intx_type_2 == IntersectType.EDGE) { v2 = splitEdgeWithLine(edge_2, p1, p2); }
+    //can't be none or degenerate
+
+    if(v1 == null || v2 == null) { throw Error("SplitedgewithLine failed in Face.splitWithLine"); }
+
+    const new_edge = this.dcel.insertEdge(v1,v2);
+    //we want the edge running from p1, to p2
+    const [ edge_p1, edge_p2 ] = new_edge.getPoints();
+
+    const delta_line = vec2.create();
+    vec2.sub(delta_line, p2, p1); //delta = p2 - p1
+
+    const delta_edge = vec2.create();
+    vec2.sub(delta_edge, edge_p2, edge_p1); //delta = end_of_edge - origin
+    
+    //if edge facing opposite to line, dot product will be negative
+    if(vec2.dot(delta_line, delta_edge) < 0) {
+      return new_edge.twin;
+    } else {
+      return new_edge;
+    }
   }
 
 }
@@ -941,8 +989,9 @@ export module Integrity {
 
     //check that im connected to origin properly. 
     const target_edge = e.origin.someEdgeAway;
-    assert(canReach(e, edge=>edge.twin.next, target_edge), 
-        `should be able reach all edges around origin, can't reach ${target_edge.toString()}`, e);
+    assert(target_edge != null, "origin should have some edge");
+    assert(canReach(e, edge=>edge.twin.next, target_edge!), 
+        `should be able reach all edges around origin, can't reach ${target_edge&&target_edge.toString()}`, e);
 
   }
 
@@ -963,7 +1012,7 @@ export module Integrity {
       assert(f.someEdge.face == f, "someEdge doesn't have me as face", f);
 
       edgeWalkForEach(f.someEdge, e => e.next, e=> {
-        assert(f.someEdge.face == f, `edge ${e.toString()} in my component doesn't have me as face`, f);
+        assert(f.someEdge!.face == f, `edge ${e.toString()} in my component doesn't have me as face`, f);
       });
 
       const am_first = dcel.faces.indexOf(f) == 0;

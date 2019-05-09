@@ -16,12 +16,12 @@ import { isInnerComponent, IntersectType, edgeIntersectLineCombinatoric, DCEL, H
 
 type Elem = Vertex | HalfEdge | Face;
 // Mocha hangs weirdly if you try to compare the actual objects
-function assertElemEqual(a: Elem, b: Elem, note="") {
+function assertElemEqual(a: Elem|null, b: Elem|null, note="") {
   let str_a = a&&a.toString();
   let str_b = b&&b.toString();
   assert.equal(str_a, str_b, note);
 }
-function assertElemNotEqual(a: Elem, b: Elem, note="") {
+function assertElemNotEqual(a: Elem|null, b: Elem|null, note="") {
   let str_a = a&&a.toString();
   let str_b = b&&b.toString();
   assert.notEqual(str_a, str_b, note);

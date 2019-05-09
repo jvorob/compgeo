@@ -9,8 +9,9 @@ import { assert } from "chai";
 // mocha doesn't need to be imported because using mochapack???
 
 
-function assertVecEqual(va: vec2, vb:vec2) {
+function assertVecEqual(va: vec2|null, vb:vec2|null) {
   let msg = `Expected ${v2ToString(va)} to equal ${v2ToString(vb)}`;
+  if(va == null || vb == null) { assert.equal(va, vb, msg); return; }
   assert(vec2.equals(va,vb), msg);
 }
 

@@ -36,10 +36,10 @@ function testGiftWrap() {
   (console as any).timeEnd("giftwrap");
 
   // ======== DRAW POINTS
-  points.forEach(v => globalCanvas.putPoint(v, 2, "red"));
-  hull.forEach(  v => globalCanvas.putPoint(v, 2));
+  points.forEach(v => globalCanvas.putPoint(v!, 2, "red"));
+  hull.forEach(  (v : any) => globalCanvas.putPoint(v, 2));
   for(let i = 1; i < hull.length; i++) {
-    globalCanvas.putLine(hull[i-1], hull[i]);
+    globalCanvas.putLine(hull[i-1]!, hull[i]!);
   }
 }
 
@@ -157,11 +157,11 @@ function giftWrap(points: vec2[]) {
 
   //======== Start with just our start point, tangent coming in from the left
   //
-  let hull = [start];
+  let hull = [start] as any;
   //TODO: improve robustness for large points
   //start as if we'd come in from the left
-  let preStart = vec2.fromValues( start[0] - 1, start[1])
-  hull.push(wrapNext(preStart, start));
+  let preStart = vec2.fromValues( start![0] - 1, start![1])
+  hull.push(wrapNext(preStart, start!));
 
   // ===== loop grabbing more points
   let goingDown = true; //make sure we dont go around multiple times
@@ -177,12 +177,12 @@ function giftWrap(points: vec2[]) {
     const secondLast = hull[hull.length - 2];
     const last = hull[hull.length - 1];
 
-    let nextPoint = wrapNext(secondLast, last);
+    let nextPoint = wrapNext(secondLast!, last!);
     //console.log("Next Point: " + v2ToString(nextPoint));
 
     // === TEST CLOSURE
     //if last->next is left of last->start
-    if(left(last, start, nextPoint) > 0) {
+    if(left(last, start!, nextPoint) > 0) {
       //close the hull TODO TEMP
       hull.push(start);
       points.push(nextPoint); //put it back, we didnt use it TODO
