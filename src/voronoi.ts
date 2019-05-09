@@ -1,7 +1,8 @@
 import { WrappedCanvas } from "./lib";
 import { vec2 } from "gl-matrix";
 import { v2ToString } from "./util";
-import { edgeWalkForEach, DCEL, Vertex, HalfEdge, Face } from "./dcel";
+import { Integrity, edgeWalkForEach, DCEL, Vertex, HalfEdge, Face } from "./dcel";
+import * as DCEL_module from "./dcel";
 import { left, pointRelToVector, orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
 
 
@@ -19,8 +20,11 @@ export function main (canvas: WrappedCanvas){
 
 class VoronoiTester {
   private readonly VERT_RADIUS=5; //pixels
+  private readonly MOUSE_RADIUS=0.05; //world
 
   private textbox: HTMLElement;
+  private lastMousePos: vec2 = vec2.create();;
+  private highlightedFeature: Vertex | HalfEdge | Face | null = null;
 
   private dcel: DCEL;
   constructor(private canvas: WrappedCanvas) {
@@ -28,18 +32,19 @@ class VoronoiTester {
 
 
     this.dcel = new DCEL();
+    //for debugging
+    (window as any).dcel = this.dcel;
+    (window as any).integ = Integrity;
+    (window as any).dcel_module = DCEL_module
     this.dcel.initializeBox();
 
-    this.dcel.insertEdge(this.dcel.verts[0], this.dcel.verts[2]);
-    this.dcel.edges[2].split(vec2.fromValues(0.8, 0.5));
 
     console.log(this.dcel.toString());
 
 
     this.canvas.canvas.addEventListener("mousemove", e=>this.handleMouseMove(e));
-    
-    //for debugging
-    (window as any).dcel = this.dcel;
+    this.canvas.canvas.addEventListener("mousedown", e=>this.handleMouseClick(e));
+
   }
 
   drawVert(vert: Vertex, style="black")  //radius 5 pixels
@@ -76,34 +81,35 @@ class VoronoiTester {
 
 
   drawFace(face: Face, style="black") {
-    edgeWalkForEach(face.someEdge, e=>e.next, e=> {
-      this.canvas.putLine(e.origin.v,e.next.origin.v,style);
-    });
+    //edgeWalkForEach(face.someEdge, e=>e.next, e=> {
+    //  this.canvas.putLine(e.origin.v,e.next.origin.v,style);
+    //});
+    if(face.site != null) {this.canvas.putPoint(face.site,this.VERT_RADIUS, style);}
   }
 
   drawFeature(elem: Vertex|HalfEdge|Face, style="black") {
     //delegates to the appropriate method
     if(elem == null) 
-      {return}
+    {return}
     else if(elem instanceof Vertex)
-      { this.drawVert(elem,style); }
+    { this.drawVert(elem,style); }
     else if(elem instanceof HalfEdge)
-      { this.drawHalfEdge(elem,style); }
+    { this.drawHalfEdge(elem,style); }
     else if(elem instanceof Face) 
-      { this.drawFace(elem, style); }
+    { this.drawFace(elem, style); }
     else { throw Error("drawFeature not implemented for" + elem); }
   }
 
   debugDrawFeature(elem: Vertex|HalfEdge|Face, style="black") {
     //delegates to the appropriate method
     if(elem == null) 
-      {return}
+    {return}
     else if(elem instanceof Vertex)
-      { this.debugDrawVert(elem); }
+    { this.debugDrawVert(elem); }
     else if(elem instanceof HalfEdge)
-      { this.debugDrawHalfEdge(elem); }
+    { this.debugDrawHalfEdge(elem); }
     else if(elem instanceof Face) 
-      { this.debugDrawFace(elem); }
+    { this.debugDrawFace(elem); }
     else { throw Error("debugDrawFeature not implemented for" + elem); }
   }
 
@@ -125,21 +131,29 @@ class VoronoiTester {
 
   debugDrawFace(face: Face) {
     edgeWalkForEach(face.someEdge, e=> e.next, e=> this.drawHalfEdge(e, "green"));
-
+    if(face.site != null) { this.canvas.putPoint(face.site, this.VERT_RADIUS, "red"); }
     this.drawHalfEdge(face.someEdge, "red");
 
   }
 
   draw() {
-
+    this.canvas.clear();
     this.canvas.drawAxes();
 
     this.dcel.verts.forEach(vert => this.drawVert(vert));
-
-    //add a little arrow, size relative to edge length?
     this.dcel.edges.forEach(edge => this.drawHalfEdge(edge));
-
+    this.dcel.faces.forEach(face => this.drawFace(face));
     //dont draw faces
+
+
+    this.debugDrawFeature(this.highlightedFeature);
+  }
+
+  update() {
+    // Draw user interaction
+    const feat = this.dcel.getFeatureNearPoint(this.lastMousePos, this.MOUSE_RADIUS);
+    this.highlightedFeature = feat;
+    this.textbox.textContent = (feat&&feat.toString());
   }
 
 
@@ -147,23 +161,137 @@ class VoronoiTester {
 
 
   // =========== UI STUFF
-
-  handleMouseMove(e: any) {
+  eventToCoords(e: any) {
     const rect = this.canvas.canvas.getBoundingClientRect();
     const s_x = e.clientX - rect.left;
     const s_y = e.clientY - rect.top;
+    return [s_x, s_y];
+  }
 
-
+  handleMouseMove(e: any) {
+    const [s_x, s_y] = this.eventToCoords(e);
     const pt = this.canvas.screen2world(vec2.fromValues(s_x,s_y));
+    this.lastMousePos.set(pt);
+
     //console.log(v2ToString(pt));
-
-    const feat = this.dcel.getFeatureNearPoint(pt, 0.05);
-    this.textbox.textContent = (feat&&feat.toString());
-
-
-    this.canvas.clear();
+    this.update();
     this.draw();
-    this.debugDrawFeature(feat);
+  }
+
+  handleMouseClick(e: any) {
+    const [s_x, s_y] = this.eventToCoords(e);
+    const pt = this.canvas.screen2world(vec2.fromValues(s_x,s_y));
+
+    const feat = this.dcel.getFeatureNearPoint(pt, this.MOUSE_RADIUS);
+    console.log("Clicked! : " + (feat && feat.toString()));
+
+    try {
+      if(feat instanceof Face) {
+        this.doAddSite(feat, pt);
+      }
+      else if(feat instanceof HalfEdge) {
+        this.doDeleteEdge(feat);
+      }
+    } catch (e) {console.error(e); }
+
+    this.update();
+    this.draw();
+  }
+
+
+  doDeleteEdge(edge: HalfEdge) {
+    edge.deleteEdge(); //Deletes the edge from the side we clicked
+    Integrity.verifyAll(this.dcel);
+  }
+
+  doAddSite(face: Face, pt: vec2) {
+    if(face.site == null) { face.site = pt; return}
+
+    console.log("splitting face for site");
+    //make perpendicular bisector
+
+    //should get perp bisector
+    let v1 = pointRelToVector(pt, face.site, 0.5, 1);
+    let v2 = pointRelToVector(pt, face.site, 0.5, -1);
+
+    const intersections = face.someEdge.lineIntersectWalk(v1,v2);
+    const [e1, p1] = intersections[0];
+    const [e2, p2] = intersections[1];
+
+    const e1_new = (e1 as HalfEdge).split(p1);
+    const e2_new = (e2 as HalfEdge).split(p2);
+
+    //split returns edge pointing at midp
+    let new_edge = this.dcel.insertEdge(e1_new.next.origin, e2_new.next.origin);
+    if(new_edge.face.site != null) { new_edge = new_edge.twin };
+
+    const new_face = new_edge.face;
+    new_face.site = pt;
+
+    console.log("new edge: " + new_edge.toString());
+    console.log("new face: " + new_face.toString());
+
+    // We have one face, fix it up
+    //new edge faces new site
+    //this.doFixupEdges(new_face, new_edge);
+    
+  }
+
+  doFixupEdges(targetFace: Face, curr_e:HalfEdge){
+    //For the newly inserted face target
+    //With the newly-inserted bisector e
+    //Want to propagate bisector to next face
+    //If hit at edge, 
+    const next_left  = curr_e.next.twin
+    const next_right = curr_e.twin.prev.twin
+
+    console.log("Fixing up at " + curr_e.toString());
+
+    if(next_left.face.isInf || next_right.face.isInf) {
+      console.log("next is inf, done");
+      return;
+    }
+
+    //if hit at vertex, go left
+    //if hit at edge, doesn't matter
+    const next_face = next_left.face;
+    const next_site = next_face.site
+    if(next_site == null) { console.log("null site"); return;}
+
+    //make perpendicular bisector
+    let v1 = pointRelToVector(targetFace.site, next_site, 0.5, 1);
+    let v2 = pointRelToVector(targetFace.site, next_site, 0.5, -1);
+
+    const intersections = next_face.someEdge.lineIntersectWalk(v1,v2);
+    const [e1, p1] = intersections[0];
+    const [e2, p2] = intersections[1];
+
+    let next_el, next_pt;
+    function check(elem: HalfEdge|Vertex, pt: vec2) {
+      if(elem instanceof Vertex) { return false; }
+      else {next_el = elem; next_pt = pt; return true;}
+    }
+
+    let count = 0;
+    if(check(e1,p1))  { count++;}
+    if(check(e2,p2))  { count++;}
+
+    if(count == 0) {throw Error("no edges intersecting"); }
+    if(count == 2) {throw Error("two edges intersecting"); } // shuldn't happen, one is a vertex
+
+    //split edge
+    const edge_to_split = next_el;
+    const e_new = (edge_to_split as HalfEdge).split(next_pt);
+    const new_vert = e_new.next.origin;
+    //split returns edge pointing at midp
+    
+    // insert edge
+    const last_vert = curr_e.next.origin;
+    let new_edge = this.dcel.insertEdge(last_vert, new_vert);
+
+    //That's the one we just hopped
+    curr_e.next.deleteEdge();
+  
   }
 }
 

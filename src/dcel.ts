@@ -93,12 +93,9 @@ export function isInnerComponent(edge: HalfEdge): boolean {
       //    ^ |             |
       //    eA|   we want eA|
       //      .             |
-      //       \            |
       //        \eB         |
       //         \v         |
-
-      //eA can't be left of vertical
-      //eB can't be vertical ever, 
+      //eA can't be left of vertical, B can't be vertical ever, 
       //we want eA if eA_next_orig is left of eB
 
       const e1_head = e1.next.origin.v;
@@ -126,6 +123,119 @@ export function isInnerComponent(edge: HalfEdge): boolean {
   else {return false;}
 }
 
+
+// ==================================================
+//                  PARTIAL PRIMITIVES
+//
+// Things which can't be called on their own, but are used as
+// building blocks in more complete methods
+// ==================================================
+
+function splitFaceAt(edge: HalfEdge) {
+  // =================================
+  // PRECONDITION: We've just inserted edge:
+  //  edge has been spliced in (next/prev/twin work safely)
+  //  faces have been set on edge and edge.twin
+  //  edge and edge.twin are no longer connected
+  //  edge.face = edge.twin.face
+  //
+  // THIS DOES:
+  //  Splits face into two faces
+  //  Assigns one face to each edge in each component
+  //
+  //  if this is the inf face, make sure that the inf side gets the inf face,
+  //  so the inf face is always the same
+  //
+  // POSTCONDITION:
+  //  Valid DCEL
+
+
+  console.log("Splitting face " + edge.face + " at edge " + edge);
+
+  let curr_face = edge.face;
+  let new_face = new Face(edge.dcel);
+
+  // ========= If splitting the face at infinity, we want the new face to be on the non-inf side
+  if(curr_face.isInf) {
+    //If the twin is the one that gets the inf side, recur on twin
+    if(isInnerComponent(edge.twin)) { 
+      splitFaceAt(edge.twin);
+      return; } }
+
+  //From now on, if curr_face.isInf, then the inf side will be on edge and not twin
+
+
+  //link faces -> edges;
+  curr_face.someEdge = edge;
+  new_face.someEdge = edge.twin;
+
+  //link edges -> faces, and propagate
+  edge.face = curr_face;
+  edge.twin.face = new_face;
+  edgeWalkForEach(edge,      e=>e.next, e=>{e.face = edge.face});
+  edgeWalkForEach(edge.twin, e=>e.next, e=>{e.face = edge.twin.face});
+
+
+  // ============ If has a site, put it on the correct side of the new edge
+  const site = curr_face.site;
+  if(site != null){
+    let side_with_site;
+    const [v0, v1] = edge.getPoints();
+    if(left(v0, v1, edge.face.site) > 0)  //if site in edge.face then site left of edge
+         { side_with_site = edge; }
+    else { side_with_site = edge.twin; }
+
+    side_with_site.face.site = site;
+    side_with_site.twin.face.site = null;
+  }
+
+  // ====== Insert into list (if a face is inf it will be curr_Face)
+  edge.dcel.faces.push(new_face)
+
+  console.log("Just split face at " + edge.toString());
+}
+
+function mergeFacesAt(edge:HalfEdge) {
+  // used for deleting an edge. Fixes up all the faces to be merged
+  // Doesn't alter edges otherwise
+  // PRECONDITION
+  //  valid DCEL
+  //  edge and edge.twin are in separate components
+  // POSTCONDITION:
+  //  edge.face = edge.twin.face, other face deleted
+  //  edges still need to be removed/deleted
+  
+  // We'll delete the twin face
+  const keep_face = edge.face
+  const del_face = edge.twin.face
+    
+  //We never want to delete the face at infinity, so switch sides if that happens
+  if(del_face.isInf) { 
+    if(keep_face.isInf) { throw Error("Merging face when both sides are inf: " + edge)}
+    mergeFacesAt(edge.twin);
+    return;
+  }
+  //Now, any inf will be on edge.face, so we can delete twin
+
+  //set twin component to keep_face
+  edgeWalkForEach(edge.twin, e=> e.next, e=>  e.face = keep_face );
+
+
+  //Merge attributes (copy over site if needed)
+  if(del_face.site != null) {
+    if(keep_face.site == null) { keep_face.site = del_face.site; }
+    else { throw Error("Can't merge two faces both with sites: " + keep_face + " " + del_face); }
+  }
+
+  // remove del_face
+  const index = edge.dcel.faces.indexOf(del_face);
+  if(index < 0){ throw Error("face not in dcel in mergeFaces");}
+  edge.dcel.faces.splice(index, 1); //delete it
+}
+
+// ==================================================
+//
+// ==================================================
 
 export class DCEL {
   public verts: Vertex[] = [];
@@ -214,7 +324,8 @@ export class DCEL {
 
     } else if (elem instanceof Face) {
       const infStr= elem.isInf ? " inf" : "";
-      msg = `[${shortcode}:${infStr} e=${this.toId(elem.someEdge)}]`;
+      const siteStr= (elem.site!=null) ? " " + v2ToString(elem.site): "";
+      msg = `[${shortcode}:${infStr}${siteStr} e=${this.toId(elem.someEdge)}]`;
 
     }
 
@@ -269,7 +380,7 @@ export class DCEL {
     //console.log(`best:${best_e.toString()}, ${min_angle}`);
   }
 
-  insertEdge(Va: Vertex, Vb: Vertex) {
+  insertEdge(Va: Vertex, Vb: Vertex): HalfEdge {
     // Inserts two half-edges between Va and Vb
     // If edge would intersect some other edge, throws.
     //
@@ -372,7 +483,7 @@ export class DCEL {
 
     // == Check if we need to split
     if(!canReach(E_ab, (e)=>e.next, E_ab.twin)){
-      Face.splitAt(E_ab);
+      splitFaceAt(E_ab);
     }
 
     // ====== Insert into arrays
@@ -487,7 +598,7 @@ export class HalfEdge {
     // if degenerate returns null
 
 
-    //console.log("splitting " + this.toString() + "at " + v2ToString(pt));
+    //console.log("splitting edge" + this + "at pt" + v2ToString(pt));
 
     //======= Check that it's on line but not on verts
     const [v1, v2] = this.getPoints();
@@ -498,6 +609,7 @@ export class HalfEdge {
       return null; }
     //console.log("checkspassed");
 
+
     //Now all is well
     const a = this.origin;
     const b = this.next.origin
@@ -505,42 +617,158 @@ export class HalfEdge {
     let mid = new Vertex(pt[0], pt[1], this.dcel);
     let e_2 = new HalfEdge(this.dcel);
     let et_2 = new HalfEdge(this.dcel);
-
-    //fix vertex
-    mid.someEdgeAway = e_2;
-    b.someEdgeAway = et_2;
-    //a is still ok
-
-    //this and twin will become e_1 and et_1
-    //this and twin origins have to change
     let e_1 = this;
     let et_1 = this.twin;
-    et_1.origin = mid;
 
     console.log(e_1.toString());
     console.log(et_1.toString());
 
-    // Make new edges, set origin, twin, set faces
+    // Make new edges, set origins, twin, set faces
     e_2.origin  = mid; e_2.twin  = et_2; e_2.face  = this.face;
     et_2.origin = b  ; et_2.twin = e_2 ; et_2.face = this.twin.face;
+    et_1.origin = mid; //twin and face are still e_1
+    mid.someEdgeAway = e_2;
+    b.someEdgeAway = et_2;
+    //a.someEdgeAway = et_1; // which it already is
 
-    //e1 and twin are still spliced around a
-    //e2 and twin get spliced around b
+    //link around b
     HalfEdge.linkEdges(e_2,this.next);
     HalfEdge.linkEdges(this.twin.prev, et_2);
 
-    //link in the middle
+    //link around mid
     HalfEdge.linkEdges(e_1,e_2);
     HalfEdge.linkEdges(et_2,et_1);
+
+    //link around a
+    //e1 and twin are already spliced around a
 
     //add everything
     this.dcel.edges.push(e_2);
     this.dcel.edges.push(et_2);
     this.dcel.verts.push(mid);
+    //a, b, e1, et1 are not new
 
     console.log("Doing verify in edge.split:");
     Integrity.verifyAll(this.dcel);
     return e_1;
+  }
+
+
+  deleteEdge() {
+    // Merges the two faces at edge and edge.twin
+    // Unsplices and deletes this edge
+    // Returns the merged face
+    //---------------------------------------------------*
+    //              Ea         Eb_next                   |
+    //        < \ \               > /                    |
+    //         \ \ >    E_ab     / /  /                  |
+    //            \      =>       /  <                   |
+    //            Va - - - - - -Vb                       |
+    //          > /      <=       \                      |
+    //         / / /    E_ba     < \ \                   |
+    //          / <               \ \ >                  |
+    //             Ea_next      Eb                       |
+    //                                                   |
+    
+    console.log("deleting edge at " + this.toString());
+
+    const E_ab = this;
+    const E_ba = this.twin;
+    const a = this.origin;
+    const b = this.twin.origin;
+
+    //first merge faces: sets all faces on both sides, merges attributes
+    if(! canReach(E_ab, e=>e.next, E_ba)) {
+      mergeFacesAt(this)
+    }
+    const new_face = E_ab.face;
+
+    //then unsplice edges
+    HalfEdge.linkEdges(E_ab.prev, E_ba.next);
+    HalfEdge.linkEdges(E_ba.prev, E_ab.next);
+
+    //console.log("unsplicing edges at " + this.toString());
+    //console.log(this.prev.toString());
+    //console.log(this.next.toString());
+
+
+    //If we're the only edge at a, origin now has no edges
+    if(E_ba.next == E_ab) { a.someEdgeAway = null; }
+    else if(a.someEdgeAway = E_ab){ a.someEdgeAway = E_ba.next } //otherwise find a replacement
+
+    //If only edge at b, update
+    if(E_ab.next == E_ba) { b.someEdgeAway = null; }
+    else if(b.someEdgeAway = E_ba){ b.someEdgeAway = E_ab.next } //otherwise find a replacement
+
+    //delete this and twin
+    const i1 = this.dcel.edges.indexOf(E_ab);
+    this.dcel.edges.splice(i1, 1); //delete it
+    const i2 = this.dcel.edges.indexOf(E_ba);
+    this.dcel.edges.splice(i2, 1); //delete it
+
+
+    //wipe them also just to be safe
+    E_ab.next = E_ab.prev = E_ab.twin = E_ab.origin = E_ab.face = null;
+    E_ba.next = E_ba.prev = E_ba.twin = E_ba.origin = E_ba.face = null;
+
+    console.log("Doing verify in edge.delete:");
+    Integrity.verifyAll(this.dcel);
+    return new_face;
+  }
+
+
+  lineIntersectWalk(a: vec2, b: vec2): Array<[Vertex|HalfEdge, vec2]> {
+    //walks the edges, returns all intersections it finds
+
+    let vertIntersect = (v:Vertex) => (distPointToLine(v.v, a, b) < DIST_EPSILON);
+    //returns true or false
+
+    let edgeIntersect = (e:HalfEdge) => {
+      //returns edge or null
+      const [v1, v2] = e.getPoints();
+      return segmentIntersectLine(v1, v2, a, b);
+    }
+
+    let intersections: Array<[Vertex|HalfEdge, vec2]> = [];
+
+    edgeWalkForEach(this, e=>e.next, (e:HalfEdge)=> {
+      if(vertIntersect(e.origin)) { intersections.push([e.origin, e.origin.v]);}
+
+      const e_int = edgeIntersect(e);
+      if(e_int != null) {
+        intersections.push([e, e_int]);
+      }
+    });
+
+
+
+    // ============== FILTER OUT DUPLICATE INTERSECTIONS (edge and vert)
+    const verts = intersections.map( ([elem,pt]) =>  elem instanceof Vertex ? elem : null );
+
+
+    const filtered = intersections.filter( ([elem, pt]) => {
+      if(elem instanceof Vertex) { return true; }
+      else { // Edge only stays if neither vertex is in 
+        return (verts.indexOf(elem.origin) < 0) && (verts.indexOf(elem.next.origin) < 0);
+      }});
+
+
+    // FANCY LOGGING
+    //console.log("ints");
+    //intersections.forEach(([elem, pt]) => {
+    //  const str = "(" + elem.toString() + ", " + v2ToString(pt) + ")";
+    //  console.log(str + ",\n");});
+
+    //console.log("verts");
+    //console.log(verts.map(v => v&&v.toString()));
+    console.log("Filtered Intersections " + this.toString() + ` ${v2ToString(a)}, ${v2ToString(b)}`);
+    filtered.forEach(([elem, pt]) => {
+      const str = "(" + elem.toString() + ", " + v2ToString(pt) + ")";
+      console.log(str + ",\n");});
+
+    if(filtered.length != 2) { throw Error(" should only ever have 2 intersections");}
+    return filtered;
+
   }
 
   static linkEdges(e1:HalfEdge, e2: HalfEdge) {
@@ -552,9 +780,11 @@ export class Face {
   public someEdge: HalfEdge | null;
   // public readonly innerComponents: HalfEdge[]; //Voronoi diagram won't have holes, dont need this
   public readonly isInf: boolean; //Set to true on the face at infinity
+  public site: vec2| null;
 
   constructor(public dcel: DCEL, isInf = false) {
     this.isInf = isInf;
+    this.site = null;
   }
 
   public toString() {
@@ -572,45 +802,6 @@ export class Face {
     return allleft;
   }
 
-  static splitAt(edge: HalfEdge) {
-    // Splits face into two faces and assign to edges
-    
-
-    let face_ab: Face;
-    let face_ba: Face;
-
-    let new_face = new Face(edge.dcel);
-    edge.dcel.faces.push(new_face);
-    
-    // ============= Figure out which face should be on which half_edge
-    if(edge.face.isInf) { //if one face is inf, need to assign it appropriately
-      const ab_inner = isInnerComponent(edge);
-      const ba_inner = isInnerComponent(edge.twin);
-
-      if(ab_inner && ba_inner){
-        //cant both be same
-        throw(Error("splitting the face at inf cant make two inner or outer"));
-
-      } else if (ab_inner) { // ab innner means ab gets inf face
-        face_ab = edge.face;
-        face_ba = new_face;
-      } else { //ba_inner
-        face_ab = new_face;
-        face_ba = edge.face;
-      }
-    } else {
-
-      face_ab = edge.face;
-      face_ba = new_face;
-    }
-
-    //Assign edges to faces
-    face_ab.someEdge = edge;
-    face_ba.someEdge = edge.twin;
-    //Assign face to edges
-    edgeWalkForEach(edge,      e=>e.next, e=>{e.face = face_ab});
-    edgeWalkForEach(edge.twin, e=>e.next, e=>{e.face = face_ba});
-  }
 }
 
 
@@ -764,31 +955,24 @@ function test():void {
 
 
 
-/* ROADMAP
+/*  =============================================
+ *                   ROADMAP
+ 
+ TODO: Handle multiple components, and holes
+ TODO: isInf will be just outerComponent == null
+       - We'll then need a pointer dcel.outsideFace, which we can update as needed
+       - Will simplify things
+TODO: Abstract out face:
+      - split and merge will let you write subclasses that work nicely
+      - Will let us have multiple versions, one voronoi, one general purpose
 
 // === Primitives
-
-Point intersects face (give back inside, edge, or vertex)
-Point intersects edge?
-Line intersects edge? (at vert or interior?)
-Line intersects face (at vert, edge, or interior?)
-
-splitEdge(e1, p) //splits edge e1 into two edges around point p
-
-//for ui we want:
-getFeatureAtPosition([x,y], epsilon=0.01)
-where epsilon is the distance within which we need to be to click on a vert/edge
+at primitive wrappers on face, vertex, etc
 
 
 
-// === Elsewhere:
-client-side, draw half-edges, faces, verts, etc
-client-side, select feature by mouse position
 
-//UI
-client-side, show debug info in box
-click in new points/edges
-etc
+
 
 // OTHER:
 how am I going to do binning?
