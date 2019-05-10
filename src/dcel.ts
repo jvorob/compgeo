@@ -4,8 +4,9 @@ import { pointsClose, segmentIntersectLine, distPointToLine,
 import { v2ToString, min, max, intStrZeroPad } from "./util";
 
 
-const DISABLE_INTEGRITY_CHECKS = true; //Integrity checks can be performed on the DCEL after most operations
-//They're like O(n^3) though
+const DISABLE_INTEGRITY_CHECKS = true; 
+//Integrity checks can be performed on the DCEL after most operations
+//They're like O(n^2), so are pretty slow
 
 
 // ==============================================================

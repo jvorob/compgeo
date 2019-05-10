@@ -7,15 +7,26 @@
   </head>
   <body>
     <div class="main">
-      <h2 class="centertext">Convex hull finder, with gift-wrapping algorithm</h2>
-      <canvas height=800 width=800 id="canvas">
-      </canvas>
-    </div>
 
-      <script type="text/javascript" src="bundle.js">
-      </script>
-      <script type="text/javascript">
-          init("convex-hull")
-      </script>
+      <h2 class="centertext">Convex hull finder, with gift-wrapping algorithm</h2>
+
+      <div class="canvas-container">
+        <canvas height=700 width=700 id="canvas"> </canvas>
+      </div>
+
+      <p>
+      Generates a random set of points in the unit square and finds their convex hull. 
+      Uses the gift wrapping algorithm, which is an O(n^2) algorithm
+      </p>
+
+
+
+
+    </div>
+    <script type="text/javascript" src="bundle.js">
+    </script>
+    <script type="text/javascript">
+        init("convex-hull")
+    </script>
   </body>
 </html>

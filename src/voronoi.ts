@@ -23,7 +23,7 @@ class VoronoiTester {
   private readonly SITE_RADIUS=5; //pixels
   private readonly MOUSE_RADIUS=0.05; //world
 
-  private readonly STEP_MODE:any="FAST"; //"FAST" or "SLOW"
+  private readonly STEP_MODE:any = "FAST"; //"FAST" or "SLOW"
   private readonly STEP_DELAY = 500;
 
   private textbox: HTMLElement;
