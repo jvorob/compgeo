@@ -1,31 +1,28 @@
 <html>
   <head>
     <meta charset="UTF8">
+<link rel="stylesheet" type="text/css" href="style.css">
 <style>
-html, body {
-  
-}
-.border {
-  border: 1px solid black;
-}
-
 #textbox {
     margin-top: 1em;
-    height: 5em;
     padding: 0.1em;
+    font-size: 1.5rem;
+    min-height: 1.5em;
 }
-
 </style>
   </head>
   <body>
-    <h2>Voronoi/Delaunay finder</h2>
-    <div class="border">
-        <canvas height=700 width=800 id="canvas">
-        </canvas>
-    </div>
+    <div class="main">
+      <h1 class="centertext">Voronoi/Delaunay finder</h1>
 
-    <div id="textbox" class="border">
-        Text will go here
+      <div class="canvas-container">
+          <canvas height=700 width=700 id="canvas">
+          </canvas>
+      </div>
+
+      <div id="textbox" class="border">
+          Text will go here
+      </div>
     </div>
 
     <script type="text/javascript" src="bundle.js">

@@ -24,6 +24,8 @@ export function main (canvas: WrappedCanvas){
  * displays it
  */
 function testGiftWrap() {
+  globalCanvas.drawAxes();
+
   let points: vec2[] = [];
   for(let i = 0; i < 100; i++) {
     points.push(genRandomPoint());
