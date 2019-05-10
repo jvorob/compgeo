@@ -10,6 +10,7 @@ Voronoi:
 Implements a doubly-connected edge-list data structure.
 Uses it to implement an interactive voronoi diagram (click to add a new vor. site)
 
+![Image of voronoi diagram](./voronoi_image.png)
 
 
 Instructions:
