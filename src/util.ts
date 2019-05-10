@@ -5,6 +5,40 @@ import {vec2} from "gl-matrix"
 // UTILITIES
 
 
+export function dom(type:string, ...contents: Array<HTMLElement | string>) {
+  //Let's you write things like:
+  // dom("div", ".border", "#someDiv", "Click here:",
+  //   dom("a", "@href=foo.com", "I'm a link")
+  // )
+  //
+  // outputs <div class="border" id="someDiv">Click here: <a href="foo.com">I'm a link</a></div>
+
+  const newElm = document.createElement(type);
+  contents.forEach(e => {
+    if(e instanceof HTMLElement){
+      newElm.appendChild(e);
+    } else if(typeof e == "string") {
+      if(e[0] == ".") {
+        newElm.classList.add(e.slice(1))
+      } else if (e[0] == "#") {
+        newElm.id = e;
+      } else if (e[0] == "@") {
+        const match = e.match(/@([^=]+)=(.+)/) //newElm.id = e;
+        if(match) {
+          console.log(match);
+          newElm.setAttribute(match[1], match[2]);
+        }else { throw Error("Attributes should be like @key=value, failed to parse: " + e); }
+      } else {
+        newElm.appendChild(document.createTextNode(e));
+      }
+    }
+  });
+  return newElm;
+}
+(window as any).dom = dom
+
+
+
 //generates a random point in the unit square
 export function genRandomPoint(): vec2 {
   let testV = vec2.fromValues(Math.random()*2 - 1,Math.random() * 2 - 1);

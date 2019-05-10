@@ -1,10 +1,9 @@
 import { WrappedCanvas } from "./lib";
 import { vec2 } from "gl-matrix";
-import { v2ToString, genRandomPoint } from "./util";
+import { dom, v2ToString, genRandomPoint } from "./util";
 import { Integrity, edgeWalkForEach,  IntersectType, lineIntersectWalk, DCEL, Vertex, HalfEdge, Face } from "./dcel";
 import * as DCEL_module from "./dcel";
 import { left, pointsClose, pointRelToVector,orientPseudoAngle, orientPseudoAngle_unrolled } from "./primitives";
-
 
 let globalCanvas: WrappedCanvas;
 
@@ -23,17 +22,24 @@ class VoronoiTester {
   private readonly SITE_RADIUS=5; //pixels
   private readonly MOUSE_RADIUS=0.05; //world
 
-  private readonly STEP_MODE:any = "FAST"; //"FAST" or "SLOW"
+  //private readonly STEP_MODE:any = "FAST"; //"FAST" or "SLOW"
   private readonly STEP_DELAY = 500;
 
-  private textbox: HTMLElement;
+  private is_already_inserting = false; 
+  //If inserting slowly, make sure we can only insert one site at a time
+
+  private textbox: HTMLElement; //textbox to put element descriptions in
+  private checkbox_slow_add: HTMLInputElement; //whether to add sites instantly or slowly
+
   private lastMousePos: vec2 = vec2.create();;
   private highlightedFeature: Vertex | HalfEdge | Face | null = null;
 
   private dcel: DCEL;
   constructor(private canvas: WrappedCanvas) {
-    this.textbox = (document.getElementById("textbox") as any);
-
+    const targetWidget = document.getElementById("textbox");
+    if(targetWidget == null) { throw Error("Need element #textbox to inject ui into"); }
+    //Insert textbox and options in there
+    this.makeOptionsBox(targetWidget);
 
     this.dcel = new DCEL();
     //for debugging
@@ -62,6 +68,25 @@ class VoronoiTester {
     //  }
     //}
   }
+
+  makeOptionsBox(target: HTMLElement) {
+    //Takes target element:
+    //sets it up to hold ui textbox and fast/slow checkbox
+    //
+    target.innerHTML = "";
+    
+    this.textbox = dom("div", "@style= font-size:1.5rem; height: 2.5rem"),
+    this.checkbox_slow_add = (dom("input", "#check-slow", "@type=checkbox") as HTMLInputElement)
+
+    const newNode = dom("div",
+      this.textbox,
+      dom("div", dom("label", "@for=check-slow", "Add sites step-by-step"), this.checkbox_slow_add)
+    );
+
+    target.insertAdjacentElement("beforeend", newNode);
+  }
+
+
 
   drawVert(vert: Vertex, style="black")  //radius 5 pixels
   { this.canvas.putPoint(vert.v, this.VERT_RADIUS, style); }
@@ -196,24 +221,35 @@ class VoronoiTester {
     this.draw();
   }
 
-  handleMouseClick(e: any) {
+  async handleMouseClick(e: any) {
     const [s_x, s_y] = this.eventToCoords(e);
     const pt = this.canvas.screen2world(vec2.fromValues(s_x,s_y));
 
     const feat = this.dcel.getFeatureNearPoint(pt, this.MOUSE_RADIUS/ 10);
     console.log("Clicked! : " + (feat && feat.toString()));
+    console.log("inserting?: " + this.is_already_inserting);
 
-    try {
-      if(feat instanceof Face) {
-        this.doAddSite(feat, pt);
-      }
-      else if(feat instanceof HalfEdge) {
-        //this.doDeleteEdge(feat);
-      }
-    } catch (e) {console.error(e); }
+    if (this.is_already_inserting) {
+      console.log("Already inserting, returning early");
+      return;
+    } else {
 
-    this.update();
-    this.draw();
+      try {
+        if(feat instanceof Face) {
+          this.is_already_inserting = true;
+          await this.doAddSite(feat, pt);
+        }
+        else if(feat instanceof HalfEdge) {
+          //this.doDeleteEdge(feat);
+        }
+      } catch (e) {console.error(e); }
+      finally {
+        this.update();
+        this.draw();
+        this.is_already_inserting = false;
+      }
+    }
+
   }
 
 
@@ -222,20 +258,29 @@ class VoronoiTester {
     Integrity.verifyAll(this.dcel);
   }
 
-  nextStep(f:Function) {
-    //For long running or interactive things, call nextStep with a continuation
-    //updates the screen
-    //calls f after some condition (time, click, something)
+  delay(): Promise<void> {
+    //If slow_add, redraws the sceen and resolves after delay
+    //Else resolve instantly
     
-    if(this.STEP_MODE == "FAST") { f() }
-    else {
+    if(this.checkbox_slow_add.checked) {  //If we asked to do it slowly, add a delay
+      console.log("delaying");
       this.update();
       this.draw();
-      setTimeout(f,this.STEP_DELAY);
+      return new Promise((resolve, reject) => {
+        setTimeout(resolve, this.STEP_DELAY);
+      });
+    }
+    else {
+      console.log("skipping delay");
+      return Promise.resolve();
     }
   }
 
-  doAddSite(face: Face, pt: vec2) {
+  done() {
+    //Should be called when doAddSite terminates
+  }
+
+  async doAddSite(face: Face, pt: vec2) {
     if(face.site == null) { face.site = pt; return}
     if(pointsClose(face.site, pt) ) { console.error("duplicate site, ignoring"); return;}
 
@@ -261,11 +306,12 @@ class VoronoiTester {
 
     // We have one face, fix it up
     //new edge faces new site
-    this.nextStep(() => this.doFixupEdgesBidirectional(new_face, new_edge, new_edge, true));
-    
+    await this.delay();
+    return this.doFixupEdgesBidirectional(new_face, new_edge, new_edge, true);
   }
 
-  doFixupEdgesBidirectional(targetFace: Face, stop_edge: HalfEdge, curr_edge:HalfEdge, isCCW: boolean): void{
+  async doFixupEdgesBidirectional(
+        targetFace: Face, stop_edge: HalfEdge, curr_edge:HalfEdge, isCCW: boolean): Promise<void>{
     //Extends the perpendicular-bisector edges for newly-inserted targetFace
     //goes CCW from curr_edge.
     //If we loop around to stop_edge, we're done
@@ -339,7 +385,8 @@ class VoronoiTester {
     //new_edge should now be facing new_face
 
     //const new_face = new_edge.face;
-    this.nextStep(() => this.doFixupEdgesBidirectional(targetFace, stop_edge, new_edge!, isCCW));
+    await this.delay();
+    return this.doFixupEdgesBidirectional(targetFace, stop_edge, new_edge!, isCCW);
   }
 
 
