@@ -354,14 +354,14 @@ export class DCEL {
   }
 
   //Sets up DCEL for initial box
-  initializeBox() {
+  //Makes box of size radius
+  initializeBox(radius=0.8) {
     let v1, v2, v3, v4: Vertex;
-    let r = 0.8;
 
-    v1 = new Vertex(-r, r, this);
-    v2 = new Vertex( r, r, this);
-    v3 = new Vertex( r,-r, this);
-    v4 = new Vertex(-r,-r, this);
+    v1 = new Vertex(-radius, radius, this);
+    v2 = new Vertex( radius, radius, this);
+    v3 = new Vertex( radius,-radius, this);
+    v4 = new Vertex(-radius,-radius, this);
 
     this.verts.push(v1);
     this.verts.push(v2);

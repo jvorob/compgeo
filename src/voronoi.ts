@@ -23,7 +23,7 @@ class VoronoiTester {
   private readonly SITE_RADIUS=5; //pixels
   private readonly MOUSE_RADIUS=0.05; //world
 
-  private readonly STEP_MODE:any="SLOW"; //"FAST" or "SLOW"
+  private readonly STEP_MODE:any="FAST"; //"FAST" or "SLOW"
   private readonly STEP_DELAY = 500;
 
   private textbox: HTMLElement;
@@ -41,7 +41,7 @@ class VoronoiTester {
     (window as any).integ = Integrity;
     (window as any).dcel_module = DCEL_module;
     (window as any).vor = this;
-    this.dcel.initializeBox();
+    this.dcel.initializeBox(1);
 
 
     console.log(this.dcel.toString());
@@ -140,14 +140,14 @@ class VoronoiTester {
     this.drawVert(edge.origin, "red");
     this.drawHalfEdge(edge.twin, "gold");
 
-    this.drawHalfEdge(edge.prev, "orangered");
+    this.drawHalfEdge(edge.prev, "magenta");
     this.drawHalfEdge(edge, "red");
-    this.drawHalfEdge(edge.next, "darkmagenta");
+    this.drawHalfEdge(edge.next, "deepskyblue");
   }
 
   debugDrawFace(face: Face) {
     if(face.someEdge != null) { 
-      edgeWalkForEach(face.someEdge, e=> e.next, e=> this.drawHalfEdge(e, "green"));
+      edgeWalkForEach(face.someEdge, e=> e.next, e=> this.drawHalfEdge(e, "limegreen"));
       this.drawHalfEdge(face.someEdge, "red");
     }
     if(face.site != null) { this.canvas.putPoint(face.site, this.VERT_RADIUS, "red"); }
@@ -156,7 +156,7 @@ class VoronoiTester {
 
   draw() {
     this.canvas.clear();
-    this.canvas.drawAxes();
+    //this.canvas.drawAxes();
 
     this.dcel.verts.forEach(vert => this.drawVert(vert));
     this.dcel.edges.forEach(edge => this.drawHalfEdge(edge));
@@ -305,7 +305,7 @@ class VoronoiTester {
     // ==== Check inf termination
     if((next_left.face.isInf || next_right.face.isInf) && isCCW) { // first time, switch to CW
       console.log("next is inf, reversing");
-      return this.doFixupEdgesBidirectional(targetFace, curr_edge, stop_edge, false); 
+      return this.doFixupEdgesBidirectional(targetFace, curr_edge, stop_edge, false);
       //stop if we come around to curr_edge, start_fixing in the other direction from our initial stop_edge
       
     } else if((next_left.face.isInf || next_right.face.isInf) && !isCCW) { // if CW, done
